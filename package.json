@@ -22,8 +22,8 @@
     "projections",
     "pattern"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "dallashall",
+  "license": "MIT",
   "description": "Event sourcing and projection pattern implementation for Drizzle ORM with PostgreSQL",
   "peerDependencies": {
     "drizzle-orm": "^0.38.3",
@@ -42,5 +42,8 @@
   },
   "dependencies": {
     "ulidx": "^2.4.1"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

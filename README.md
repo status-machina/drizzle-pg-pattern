@@ -10,7 +10,7 @@ A pattern for implementing event sourcing with PostgreSQL and Drizzle ORM.
 
 ```typescript
 // schema.ts
-import { createEventsTable, createProjectionsTable } from 'status-machina-drizzle-pattern';
+import { createEventsTable, createProjectionsTable } from '@status-machina/drizzle-pg-pattern';
 
 export const events = createEventsTable({
   schema: "my_app",
@@ -54,7 +54,7 @@ export type AppEventBase = {
 
 ```typescript
 // events/index.ts
-import { InputOf } from 'status-machina-drizzle-pattern';
+import { InputOf } from '@status-machina/drizzle-pg-pattern';
 
 interface CartCreatedEvent extends AppEventBase {
   type: AppEventTypes.CART_CREATED;
@@ -104,7 +104,7 @@ export type AppEventInput = InputOf<AppEvent>;
 
 ```typescript
 // client.ts
-import { createEventClient } from 'status-machina-drizzle-pattern';
+import { createEventClient } from '@status-machina/drizzle-pg-pattern';
 import { db } from './db';
 import { events, projections } from './schema';
 import { AppEventTypes } from './eventTypes';
@@ -163,7 +163,7 @@ await client.saveEvents([
 
 ```typescript
 // projections/base.ts
-import { ProjectionBase } from 'status-machina-drizzle-pattern';
+import { ProjectionBase } from '@status-machina/drizzle-pg-pattern';
 
 export const Projection = <T extends Record<string, unknown>>() => ProjectionBase<
   AppEventTypes,
