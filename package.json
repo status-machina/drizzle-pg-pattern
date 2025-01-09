@@ -11,9 +11,8 @@
   ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest",
-    "generate": "drizzle-kit generate",
-    "migrate": "tsx src/migrate.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "npm run test && npm run build"
   },
   "keywords": [
