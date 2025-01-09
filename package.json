@@ -5,24 +5,43 @@
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest"
+    "test": "vitest",
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx src/migrate.ts",
+    "prepublishOnly": "npm run test && npm run build"
   },
-  "keywords": [],
+  "keywords": [
+    "drizzle",
+    "postgres",
+    "event-sourcing",
+    "projections",
+    "pattern"
+  ],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Event sourcing and projection pattern implementation for Drizzle ORM with PostgreSQL",
   "peerDependencies": {
     "drizzle-orm": "^0.38.3",
     "postgres": "^3.4.5"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "dotenv": "^16.4.7",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "@testcontainers/postgresql": "^10.7.1",
+    "testcontainers": "^10.7.1",
+    "drizzle-kit": "^0.30.1",
+    "tsx": "^4.7.1"
+  },
+  "dependencies": {
+    "ulidx": "^2.4.1"
   }
 }
