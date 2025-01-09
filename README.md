@@ -1,5 +1,7 @@
 # Status Machina Drizzle Pattern
 
+> ⚠️ **Warning**: This package is currently in early development and is not stable. The API may change without notice. Not recommended for production use.
+
 A pattern for implementing event sourcing with PostgreSQL and Drizzle ORM.
 
 ## Setup
