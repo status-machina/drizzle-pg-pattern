@@ -159,6 +159,61 @@ await client.saveEvents([
 ]);
 ```
 
+### Writing Events with Stream Validation
+
+The `saveEventWithStreamValidation` method helps maintain data consistency by ensuring no relevant events have been added since you last checked the state. This is particularly useful when business rules depend on the current state.
+
+```typescript
+// Example: Adding an item to cart, but only if the cart hasn't been checked out
+const cart = new CartProjection(cartId, client);
+const cartView = await cart.asJson();
+
+if (cartView.isCheckedOut) {
+  throw new Error("Cannot add items to a checked out cart");
+}
+
+// Get the latest event we've seen
+const latestEvent = await client.getLatestEvent(AppEventTypes.CART_CREATED, {
+  data: { cartId }
+});
+
+// Try to save the event, but only if no newer events exist in either:
+// 1. The cart lifecycle stream (CREATED -> CHECKED_OUT)
+// 2. The items stream (ADDED -> REMOVED)
+await client.saveEventWithStreamValidation(
+  {
+    type: AppEventTypes.ITEM_ADDED_TO_CART,
+    data: {
+      cartId,
+      productId: "prod_789",
+      quantity: 1,
+      priceAtTime: 1999
+    }
+  },
+  latestEvent.id,
+  [
+    {
+      // Ensure cart hasn't been checked out
+      types: [
+        AppEventTypes.CART_CREATED,
+        AppEventTypes.CART_CHECKED_OUT
+      ],
+      identifier: { cartId }
+    },
+    {
+      // Ensure no concurrent item modifications
+      types: [
+        AppEventTypes.ITEM_ADDED_TO_CART,
+        AppEventTypes.ITEM_REMOVED_FROM_CART
+      ],
+      identifier: { cartId }
+    }
+  ]
+);
+```
+
+This approach prevents race conditions where the cart might have been checked out or modified between when you checked the state and when you tried to add the item.
+
 ### Creating Projections
 
 ```typescript

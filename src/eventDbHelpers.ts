@@ -251,29 +251,6 @@ export function createEventClient<
       return projection as { data: T; latestEventId: string } | undefined;
     },
 
-    /**
-     * IDEAL SQL (keep this comment block for reference):
-     * 
-     * WITH new_event AS (
-     *   INSERT INTO "example_app.events" ("id", "type", "data", "created_at", "updated_at")
-     *   VALUES ('01...', 'ITEM_ADDED', '{"listId": "123"}', DEFAULT, DEFAULT)
-     *   RETURNING *
-     * )
-     * SELECT * FROM new_event
-     * WHERE NOT EXISTS (
-     *   SELECT 1 FROM "example_app.events"
-     *   WHERE "type" IN ('ITEM_ADDED', 'ITEM_COMPLETED')
-     *   AND "id" > '01...'
-     *   AND "data"->>'listId' = '123'
-     * )
-     * AND NOT EXISTS (
-     *   SELECT 1 FROM "example_app.events"
-     *   WHERE "type" IN ('LIST_CREATED', 'LIST_DELETED')
-     *   AND "id" > '01...'
-     *   AND "data"->>'listId' = '123'
-     * );
-     */
-
     async saveEventWithStreamValidation(
       eventInput: InputOf<Events>,
       latestEventId: string,
@@ -300,7 +277,6 @@ export function createEventClient<
         return check;
       });
 
-      // Build the complete query with CTE
       const query = sql`
         WITH new_event AS (
           INSERT INTO ${events} (id, type, data, created_at, updated_at)
