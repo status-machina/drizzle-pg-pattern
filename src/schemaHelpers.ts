@@ -68,7 +68,7 @@ export function createEventsTable(config: EventsTableConfig = {}) {
   );
 }
 
-export function createProjectionsTable(config: ProjectionsTableConfig = {}) {
+export function createProjectionBaseClasssTable(config: ProjectionsTableConfig = {}) {
   const {
     schema,
     name = 'projections',
@@ -104,9 +104,9 @@ export function createProjectionsTable(config: ProjectionsTableConfig = {}) {
 }
 
 export type GenericEventsType = (ReturnType<typeof createEventsTable>)['$inferSelect'];
-export type GenericProjectionsType = (ReturnType<typeof createProjectionsTable>)['$inferSelect'];
+export type GenericProjectionsType = (ReturnType<typeof createProjectionBaseClasssTable>)['$inferSelect'];
 export type GenericEventsTable = ReturnType<typeof createEventsTable>;
-export type GenericProjectionsTable = ReturnType<typeof createProjectionsTable>;
+export type GenericProjectionsTable = ReturnType<typeof createProjectionBaseClasssTable>;
 
 export type GenericEventBase<T> = GenericEventsType & {
   type: T;

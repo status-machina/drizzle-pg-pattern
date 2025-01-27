@@ -27,7 +27,51 @@ import {
 } from "./utils";
 import { PgInsertValue, PgUpdateSetSource, PgDialect } from "drizzle-orm/pg-core";
 import { monotonicFactory } from "ulidx";
-import { after } from "node:test";
+
+export type EventClient<
+  EventType extends string = any,
+  Events extends GenericEventBase<EventType> = any,
+  J extends Record<string, unknown> = any,
+  K extends TablesRelationalConfig = any,
+  Db extends PostgresJsDatabase<any> = any
+> = {
+  readonly saveEvent: (eventInput: InputOf<Events>, tx?: PostgresJsTransaction<J, K>) => Promise<Events & {
+    type: EventType;
+  }>;
+  readonly saveEvents: <T extends InputOf<Events>>(eventInputs: T[], tx?: DbOrTx<Db>) => Promise<(Events & {
+    type: EventType;
+  })[]>;
+  readonly getLatestEvent: (eventType: EventType, options?: EventQueryOptions<EventType, Events>) => Promise<Events & {
+    type: EventType;
+  }>;
+  readonly getEventStream: <T extends EventType>(eventTypes: T[], options?: EventQueryOptions<EventType, Events & {
+    type: T;
+  }>) => Promise<(Events & {
+    type: EventType;
+  })[]>;
+  readonly saveProjection: (params: {
+    type: string;
+    id: string;
+    data: Record<string, unknown>;
+    latestEventId: string;
+  } & PgInsertValue<GenericProjectionsTable> & PgUpdateSetSource<GenericProjectionsTable>) => Promise<{
+    id: string;
+    data: unknown;
+    type: string;
+    latestEventId: string;
+    status: "created" | "updated" | "skipped";
+  }>;
+  readonly getProjection: <T>(params: {
+    type: string;
+    id: string;
+  }) => Promise<{
+    data: T;
+    latestEventId: string;
+  } | undefined>;
+  readonly saveEventWithStreamValidation: (eventInput: InputOf<Events>, latestEventId: string, streams: StreamDefinition<EventType, Events>[]) => Promise<Events & {
+    type: EventType;
+  }>;
+};
 
 /** This is a utility type that helps to get type safety and autocomplete for the data field in the query options. */
 type EventQueryOptions<
@@ -298,11 +342,3 @@ export function createEventClient<
     },
   } as const;
 }
-
-export type EventClient<
-  T extends ReturnType<
-    typeof createEventClient<string, GenericEventBase<string>, any, any, any>
-  > = ReturnType<
-    typeof createEventClient<string, GenericEventBase<string>, any, any, any>
-  >
-> = T;

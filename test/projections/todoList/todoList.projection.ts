@@ -1,4 +1,4 @@
-import { ProjectionBase, EventClient } from "../../../src";
+import { createProjectionBaseClass } from "../../../dist";
 import { ExampleAppEvent, ExampleAppEventTypes, getEventClient } from "../../events";
 import { toCompletedItems } from "./to.completedItems";
 import { toIncompleteItems } from "./to.incompleteItems";
@@ -8,12 +8,12 @@ type TodoListView = {
   completedItems: string[];
 };
 
-const Projection = <T extends Record<string, unknown>>() => ProjectionBase<
+const Projection = <T extends Record<string, unknown>>() => createProjectionBaseClass<
   ExampleAppEventTypes,
   ExampleAppEvent,
-  EventClient,
+  ReturnType<typeof getEventClient>,
   T
->;
+>();
 
 export class TodoListProjection extends Projection<TodoListView>() {
   protected get eventTypes() {

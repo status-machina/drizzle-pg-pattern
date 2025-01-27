@@ -10,10 +10,10 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup",
-    "test": "vitest run",
+    "build": "rm -rf dist && tsc --emitDeclarationOnly --declaration --outDir dist && tsup",
+    "test": "npm run build && vitest run",
     "test:watch": "vitest",
-    "prepublishOnly": "npm run test && npm run build"
+    "prepublishOnly": "npm run test"
   },
   "keywords": [
     "drizzle",

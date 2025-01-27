@@ -4,9 +4,9 @@ import { ItemAddedEvent } from "./structs/itemAdded.event";
 import { ItemRemovedEvent } from "./structs/itemRemoved.event";
 import { ItemCompletedEvent } from "./structs/itemCompleted.event";
 import { ItemUncompletedEvent } from "./structs/itemUncompleted.event";
-import { InputOf } from "../../src/schemaHelpers";
+import { InputOf } from "../../dist";
 import { ExampleAppEventTypes } from "./eventBase";
-import { createEventClient } from "../../src";
+import { createEventClient } from "../../dist";
 import { exampleAppEvents, exampleAppProjections } from '../drizzle/schema'
 import { db } from "../drizzle/db";
 
