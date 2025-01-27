@@ -352,7 +352,126 @@ export class CartProjection extends Projection<CartView>() {
     };
   }
 }
+
+### Creating Multi-Stream Projections
+
+For cases where you need to combine events from multiple streams with different filters, you can use the `MultiStreamProjectionBase`. This is useful when building projections that need to track related but distinct event streams.
+
+```typescript
+// projections/base.ts
+import { createMultiStreamProjectionBaseClass } from '@status-machina/drizzle-pg-pattern';
+
+export const MultiStreamProjection = <T extends Record<string, unknown>>() => createMultiStreamProjectionBaseClass<
+  AppEventTypes,
+  AppEvent,
+  ReturnType<typeof getEventClient>,
+  T
+>();
+
+// projections/cartWithMeta.projection.ts
+import { MultiStreamProjection } from './base';
+import { toItems } from '../reducers/to.items';
+
+type CartWithMetaView = {
+  id: string;
+  userId: string;
+  items: CartItem[];
+  isCheckedOut: boolean;
+  total: number;
+  lastModified: string;
+  modifiedBy: string;
+};
+
+export class CartWithMetaProjection extends MultiStreamProjection<CartWithMetaView>() {
+  protected get projectionType() {
+    return "SHOPPING_CART_WITH_META";
+  }
+
+  constructor(
+    private cartId: string,
+    protected eventsClient: ReturnType<typeof getEventClient>
+  ) {
+    super(eventsClient);
+  }
+
+  public get id() {
+    return this.cartId;
+  }
+
+  protected getStreamOptions() {
+    return [
+      {
+        // Cart lifecycle events
+        eventTypes: [
+          AppEventTypes.CART_CREATED,
+          AppEventTypes.CART_CHECKED_OUT
+        ],
+        options: { data: { cartId: this.cartId } }
+      },
+      {
+        // Item events
+        eventTypes: [
+          AppEventTypes.ITEM_ADDED_TO_CART,
+          AppEventTypes.ITEM_REMOVED_FROM_CART
+        ],
+        options: { data: { cartId: this.cartId } }
+      },
+      {
+        // Metadata events
+        eventTypes: [
+          AppEventTypes.CART_MODIFIED
+        ],
+        options: { data: { cartId: this.cartId } }
+      }
+    ];
+  }
+
+  private async getCartMeta() {
+    return this.reduceEvents(
+      (acc, event) => {
+        switch (event.type) {
+          case AppEventTypes.CART_MODIFIED:
+            return {
+              lastModified: event.data.modifiedAt,
+              modifiedBy: event.data.modifiedBy
+            };
+          default:
+            return acc;
+        }
+      },
+      { lastModified: "", modifiedBy: "" }
+    );
+  }
+
+  public async asJson(): Promise<CartWithMetaView> {
+    const userId = await this.reduceEvents(toUserId, "");
+    const items = await this.reduceEvents(toItems, []);
+    const isCheckedOut = await this.reduceEvents(toIsCheckedOut, false);
+    const meta = await this.getCartMeta();
+    
+    const total = items.reduce((sum, item) => 
+      sum + (item.quantity * item.priceAtTime), 0);
+
+    return {
+      id: this.cartId,
+      userId,
+      items,
+      isCheckedOut,
+      total,
+      ...meta
+    };
+  }
+}
 ```
+
+The key differences between `ProjectionBase` and `MultiStreamProjectionBase` are:
+
+1. Instead of `eventTypes` and `getEventIdentifiers`, you implement a single `getStreamOptions` method
+2. Each stream can have its own event types and filters
+3. Events from all streams are automatically merged and ordered by ID
+4. The `after` parameter for each stream is handled automatically based on the projection's `latestEventId`
+
+This makes it easier to build complex projections that need to combine events from different streams while maintaining proper ordering and consistency.
 
 ## Features
 

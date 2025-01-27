@@ -28,6 +28,7 @@ import {
 import { PgInsertValue, PgUpdateSetSource, PgDialect } from "drizzle-orm/pg-core";
 import { monotonicFactory } from "ulidx";
 
+
 export type EventClient<
   EventType extends string = any,
   Events extends GenericEventBase<EventType> = any,
@@ -47,6 +48,9 @@ export type EventClient<
   readonly getEventStream: <T extends EventType>(eventTypes: T[], options?: EventQueryOptions<EventType, Events & {
     type: T;
   }>) => Promise<(Events & {
+    type: EventType;
+  })[]>;
+  readonly getEventStreams: <T extends EventType>(streams: { eventTypes: T[], options?: EventQueryOptions<EventType, Events & { type: T }> }[]) => Promise<(Events & {
     type: EventType;
   })[]>;
   readonly saveProjection: (params: {
@@ -228,6 +232,25 @@ export function createEventClient<
         .where(and(...conditions))
         .orderBy(asc(events.id))) as (Events & { type: EventType })[];
       return result;
+    },
+
+    async getEventStreams<T extends EventType>(
+      streams: { eventTypes: T[], options?: EventQueryOptions<EventType, Events & { type: T }> }[]
+    ): Promise<(Events & { type: EventType })[]> {
+      const dbOrTx = streams[0]?.options?.tx ?? db;
+
+      const results = await Promise.all(
+        streams.map(({ eventTypes, options }) =>
+          this.getEventStream(eventTypes, { ...options, tx: dbOrTx })
+        )
+      );
+
+      const allEvents = results.flat();
+      const uniqueEvents = Array.from(
+        new Map(allEvents.map(event => [event.id, event])).values()
+      );
+
+      return uniqueEvents.sort((a, b) => a.id.localeCompare(b.id));
     },
 
     /**

@@ -5,6 +5,7 @@ import { ExampleAppEventInput } from "./events";
 import { ulid } from "ulidx";
 import { setupTestDatabase, teardownTestDatabase } from "./drizzle/db";
 import { ItemAddedEvent } from "./events/structs/itemAdded.event";
+import { TodoListWithMetaProjection } from "./projections/todoList/todoListWithMeta.projection";
 
 describe("Event Sourcing", () => {
   let eventClient: ReturnType<typeof getEventClient>;
@@ -88,6 +89,29 @@ describe("Event Sourcing", () => {
     expect(itemEvents[1].type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
   });
 
+  it("should retrieve and merge multiple event streams", async () => {
+    const { events, listId, itemId } = getTestEvents();
+    await eventClient.saveEvents(events);
+
+    const streams = [
+      {
+        eventTypes: [ExampleAppEventTypes.LIST_CREATED],
+        options: { data: { listId } }
+      },
+      {
+        eventTypes: [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
+        options: { data: { itemId } }
+      }
+    ];
+
+    const mergedEvents = await eventClient.getEventStreams(streams);
+
+    expect(mergedEvents).toHaveLength(3);
+    expect(mergedEvents[0].type).toBe(ExampleAppEventTypes.LIST_CREATED);
+    expect(mergedEvents[1].type).toBe(ExampleAppEventTypes.ITEM_ADDED);
+    expect(mergedEvents[2].type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
+  });
+
   it("should build projection from events", async () => {
     const { events, listId, itemId } = getTestEvents();
     await eventClient.saveEvents(events);
@@ -137,6 +161,32 @@ describe("Event Sourcing", () => {
     expect(view.items).toHaveLength(1);
     expect(view.items[0]).toBe(itemId);
     expect(view.completedItems).toHaveLength(0);
+  });
+
+  it("should combine list and item events in multi-stream projection", async () => {
+    const { events, listId, itemId } = getTestEvents();
+    await eventClient.saveEvents(events);
+
+    const projection = new TodoListWithMetaProjection(listId, eventClient);
+    const view = await projection.asJson();
+
+    expect(view.listName).toBe("Test List");
+    expect(view.isDeleted).toBe(false);
+    expect(view.items).toHaveLength(0);
+    expect(view.completedItems).toHaveLength(1);
+    expect(view.completedItems[0]).toBe(itemId);
+
+    // Delete the list
+    await eventClient.saveEvent({
+      type: ExampleAppEventTypes.LIST_DELETED,
+      data: { listId }
+    });
+
+    const updatedProjection = new TodoListWithMetaProjection(listId, eventClient);
+    const updatedView = await updatedProjection.asJson();
+    expect(updatedView.isDeleted).toBe(true);
+    expect(updatedView.items).toHaveLength(0);
+    expect(updatedView.completedItems).toHaveLength(1);
   });
 
   describe("Event Stream Validation", () => {

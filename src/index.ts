@@ -1,6 +1,7 @@
 import { type EventClient } from "./eventDbHelpers";
 import { type GenericEventBase } from "./schemaHelpers";
 import { ProjectionBase } from "./projection";
+import { MultiStreamProjectionBase } from "./multiStreamProjection";
 
 export {
   createEventsTable,
@@ -27,6 +28,7 @@ export {
 } from "./utils";
 
 export { ProjectionBase, type ProjectionBase as ProjectionBaseType } from "./projection";
+export { MultiStreamProjectionBase, type MultiStreamProjectionBase as MultiStreamProjectionBaseType } from "./multiStreamProjection";
 
 export const createProjectionBaseClass = <
   EventType extends string,
@@ -34,3 +36,10 @@ export const createProjectionBaseClass = <
   Client extends EventClient<EventType, Event>,
   V extends Record<string, unknown>
 >() => ProjectionBase<EventType, Event, Client, V>;
+
+export const createMultiStreamProjectionBaseClass = <
+  EventType extends string,
+  Event extends GenericEventBase<EventType>,
+  Client extends EventClient<EventType, Event>,
+  V extends Record<string, unknown>
+>() => MultiStreamProjectionBase<EventType, Event, Client, V>;
