@@ -5,7 +5,7 @@ import { MultiStreamProjectionBase } from "./multiStreamProjection";
 
 export {
   createEventsTable,
-  createProjectionBaseClasssTable,
+  createProjectionsTable,
   type GenericEventsType,
   type GenericProjectionsType,
   type GenericEventsTable,

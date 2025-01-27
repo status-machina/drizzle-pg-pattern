@@ -8,7 +8,6 @@ import {
   pgTable,
   ExtraConfigColumn,
   PgInsertValue,
-  uuid,
 } from 'drizzle-orm/pg-core';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { ulid } from 'ulidx';
@@ -68,7 +67,7 @@ export function createEventsTable(config: EventsTableConfig = {}) {
   );
 }
 
-export function createProjectionBaseClasssTable(config: ProjectionsTableConfig = {}) {
+export function createProjectionsTable(config: ProjectionsTableConfig = {}) {
   const {
     schema,
     name = 'projections',
@@ -104,9 +103,9 @@ export function createProjectionBaseClasssTable(config: ProjectionsTableConfig =
 }
 
 export type GenericEventsType = (ReturnType<typeof createEventsTable>)['$inferSelect'];
-export type GenericProjectionsType = (ReturnType<typeof createProjectionBaseClasssTable>)['$inferSelect'];
+export type GenericProjectionsType = (ReturnType<typeof createProjectionsTable>)['$inferSelect'];
 export type GenericEventsTable = ReturnType<typeof createEventsTable>;
-export type GenericProjectionsTable = ReturnType<typeof createProjectionBaseClasssTable>;
+export type GenericProjectionsTable = ReturnType<typeof createProjectionsTable>;
 
 export type GenericEventBase<T> = GenericEventsType & {
   type: T;

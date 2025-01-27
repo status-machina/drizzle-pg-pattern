@@ -1,4 +1,4 @@
-import { createEventsTable, createProjectionBaseClasssTable } from "../../dist";
+import { createEventsTable, createProjectionsTable } from "../../dist";
 
 export const exampleAppEvents = createEventsTable({
     schema: "example_app",
@@ -9,7 +9,7 @@ export const exampleAppEvents = createEventsTable({
     ],
 });
 
-export const exampleAppProjections = createProjectionBaseClasssTable({
+export const exampleAppProjections = createProjectionsTable({
     schema: "example_app",
     name: "views",
     dataIndexes: [
