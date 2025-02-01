@@ -214,6 +214,33 @@ await client.saveEventWithStreamValidation(
 
 This approach prevents race conditions where the cart might have been checked out or modified between when you checked the state and when you tried to add the item.
 
+### Querying Projections
+
+You can query projections by their type and data:
+
+```typescript
+// Get all cart projections
+const allCarts = await client.queryProjections({
+  type: "CART"
+});
+
+// Get a specific cart by cartId
+const specificCart = await client.queryProjections({
+  type: "CART",
+  data: { cartId: "cart_123" }
+});
+
+// Get multiple carts by cartIds
+const multipleCarts = await client.queryProjections({
+  type: "CART",
+  data: { cartId: ["cart_123", "cart_456"] }
+});
+
+// Note: When querying array fields in projections, the query looks for exact matches
+// For example, if your projection has items: string[], querying { items: ["item_1"] }
+// will only match projections where items is exactly ["item_1"]
+```
+
 ### Creating Projections
 
 ```typescript
