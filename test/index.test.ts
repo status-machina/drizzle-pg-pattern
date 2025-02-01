@@ -139,6 +139,48 @@ describe("Event Sourcing", () => {
     expect(view.completedItems[0]).toBe(itemId);
   });
 
+  it("should query projections by type and data", async () => {
+    const { events: events1, listId: listId1 } = getTestEvents();
+    const { events: events2, listId: listId2 } = getTestEvents();
+    await eventClient.saveEvents([...events1, ...events2]);
+
+    const projection1 = new TodoListProjection(listId1, eventClient);
+    const projection2 = new TodoListProjection(listId2, eventClient);
+    await projection1.saveProjection();
+    await projection2.saveProjection();
+
+    // Query by type only
+    const allTodoLists = await eventClient.queryProjections({
+      type: "TODO_LIST"
+    });
+    expect(allTodoLists.length).toBeGreaterThanOrEqual(2);
+    expect(allTodoLists.map(l => l.data.listId)).toContain(listId1);
+    expect(allTodoLists.map(l => l.data.listId)).toContain(listId2);
+
+    // Query by type and data
+    const specificList = await eventClient.queryProjections<TodoListProjection>({
+      type: "TODO_LIST",
+      data: { listId: listId1 }
+    });
+    expect(specificList).toHaveLength(1);
+    expect(specificList[0].data.items).toHaveLength(0);
+
+    // Query that should return no results
+    const emptyResult = await eventClient.queryProjections({
+      type: "TODO_LIST",
+      data: { listId: "non-existent-id" }
+    });
+    expect(emptyResult).toHaveLength(0);
+
+    const twoLists = await eventClient.queryProjections({
+      type: "TODO_LIST",
+      data: { listId: [listId1, listId2] }
+    });
+    expect(twoLists).toHaveLength(2);
+    expect(twoLists.map(l => l.data.listId)).toContain(listId1);
+    expect(twoLists.map(l => l.data.listId)).toContain(listId2);
+  });
+
   it("should update projection with new events", async () => {
     const { events, listId, itemId } = getTestEvents();
     await eventClient.saveEvents(events);

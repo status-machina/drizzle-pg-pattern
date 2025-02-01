@@ -27,6 +27,8 @@ import {
 } from "./utils";
 import { PgInsertValue, PgUpdateSetSource, PgDialect } from "drizzle-orm/pg-core";
 import { monotonicFactory } from "ulidx";
+import { ProjectionBase } from "./projection";
+import { MultiStreamProjectionBase } from "./multiStreamProjection";
 
 
 export type EventClient<
@@ -72,6 +74,13 @@ export type EventClient<
     data: T;
     latestEventId: string;
   } | undefined>;
+  readonly queryProjections: <T extends {asJson: () => Promise<Record<string, unknown>>}>(params: {
+    type: string;
+    data?: Partial<Awaited<ReturnType<T['asJson']>>>;
+  }) => Promise<{
+    data: Awaited<ReturnType<T['asJson']>>;
+    latestEventId: string;
+  }[]>;
   readonly saveEventWithStreamValidation: (eventInput: InputOf<Events>, latestEventId: string, streams: StreamDefinition<EventType, Events>[]) => Promise<Events & {
     type: EventType;
   }>;
@@ -316,6 +325,50 @@ export function createEventClient<
           and(eq(projections.type, params.type), eq(projections.id, params.id))
         );
       return projection as { data: T; latestEventId: string } | undefined;
+    },
+
+    async queryProjections<T extends {asJson: () => Promise<Record<string, unknown>>}>(params: {
+      type: string;
+      data?: Partial<Awaited<ReturnType<T['asJson']>>>;
+    }): Promise<{data: Awaited<ReturnType<T['asJson']>>, latestEventId: string}[]> {
+      const conditions = [eq(projections.type, params.type)];
+
+      if (params.data) {
+        const dataConditions = Object.entries(params.data)
+          .map(([key, value]): SQL<unknown> | undefined => {
+            if (value === undefined) {
+              return undefined;
+            }
+            if (Array.isArray(value)) {
+              return value.length > 0
+                ? or(
+                    ...value.map(
+                      (v) => sql`${projections.data}->>${key} = ${v.toString()}`
+                    )
+                  )
+                : undefined;
+            }
+            return isDefined(value)
+              ? sql`${projections.data}->>${key} = ${value.toString()}`
+              : undefined;
+          })
+          .filter(isDefined);
+
+        const dataSql =
+          dataConditions.length > 0 ? and(...dataConditions) : undefined;
+        if (dataSql) {
+          conditions.push(dataSql);
+        }
+      }
+
+      const foundProjections = await db
+        .select({
+          data: projections.data,
+          latestEventId: projections.latestEventId,
+        })
+        .from(projections)
+        .where(and(...conditions));
+      return foundProjections as {data: Awaited<ReturnType<T['asJson']>>, latestEventId: string}[];
     },
 
     async saveEventWithStreamValidation(

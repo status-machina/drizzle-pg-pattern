@@ -4,6 +4,7 @@ import { toCompletedItems } from "./to.completedItems";
 import { toIncompleteItems } from "./to.incompleteItems";
 
 type TodoListView = {
+  listId: string;
   items: string[];
   completedItems: string[];
 };
@@ -65,6 +66,7 @@ export class TodoListProjection extends Projection<TodoListView>() {
 
   public async asJson(): Promise<TodoListView> {
     return {
+      listId: this.listId,
       items: await this.incompleteItems(),
       completedItems: await this.completedItems(),
     };
