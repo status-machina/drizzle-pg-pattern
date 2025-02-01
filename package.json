@@ -4,6 +4,10 @@
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/status-machina/drizzle-pg-pattern.git"
+  },
   "files": [
     "dist",
     "README.md",
