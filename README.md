@@ -363,9 +363,11 @@ export class CartProjection extends Projection<CartView>() {
   }
 
   public async asJson(): Promise<CartView> {
-    const userId = await this.reduceEvents(toUserId, "");
-    const items = await this.reduceEvents(toItems, []);
-    const isCheckedOut = await this.reduceEvents(toIsCheckedOut, false);
+    const projection = await this.savedProjection;
+    // Use the data from the saved projection if it exists, otherwise use the initial state
+    const userId = await this.reduceEvents(toUserId, projection?.data.userId || "");
+    const items = await this.reduceEvents(toItems, projection?.data.items || []);
+    const isCheckedOut = await this.reduceEvents(toIsCheckedOut, projection?.data.isCheckedOut || false);
     
     const total = items.reduce((sum, item) => 
       sum + (item.quantity * item.priceAtTime), 0);
