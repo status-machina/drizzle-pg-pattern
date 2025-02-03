@@ -56,7 +56,7 @@ export function createEventsTable(config: EventsTableConfig = {}) {
       // Create indexes for each data field
       ...dataIndexes.map(field => 
         index(`${name}_data_${field}_idx`).on(
-          sql`(${table.data}->>'${field}')`
+          sql`(${table.data}->>'${sql.raw(field)}')`
         )
       ),
       // Add any additional custom indexes
@@ -91,7 +91,7 @@ export function createProjectionsTable(config: ProjectionsTableConfig = {}) {
       // Create indexes for each data field
       ...dataIndexes.map(field => 
         index(`${name}_data_${field}_idx`).on(
-          sql`(${table.data}->>'${field}')`
+          sql`(${table.data}->>'${sql.raw(field)}')`
         )
       ),
       // Add any additional custom indexes
