@@ -25,6 +25,7 @@ export {
   type ObjectWithOnlyStringOrNumberValues,
   type ObjectWithOnlyStringOrNumberValuesOrArrayValues,
   type EventFromType,
+  type StreamOptionsForEvents,
 } from "./utils";
 
 export { ProjectionBase, type ProjectionBase as ProjectionBaseType } from "./projection";
