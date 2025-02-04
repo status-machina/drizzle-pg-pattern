@@ -29,11 +29,6 @@ export class MultiStreamProjectionBase<
   V extends Record<string, unknown>,
   ET extends EventType = EventType,
   E extends EventFromType<ET, Event> = EventFromType<ET, Event>,
-  O extends ObjectWithOnlyStringOrNumberValuesOrArrayValues<
-    E["data"]
-  > = ObjectWithOnlyStringOrNumberValuesOrArrayValues<E["data"]>,
-  K extends keyof O = keyof O,
-  P extends Partial<Pick<O, K>> = Partial<Pick<O, K>>,
 > {
   /** The type of this projection, used to look up the projection in the database */
   protected get projectionType(): string {
