@@ -21,7 +21,7 @@ export class MultiStreamProjectionBase<
   E extends EventFromType<ET, Event> = EventFromType<ET, Event>,
   O extends ObjectWithOnlyStringOrNumberValuesOrArrayValues<
     E["data"]
-  > = ObjectWithOnlyStringOrNumberValues<E["data"]>,
+  > = ObjectWithOnlyStringOrNumberValuesOrArrayValues<E["data"]>,
   K extends keyof O = keyof O,
   P extends Partial<Pick<O, K>> = Partial<Pick<O, K>>,
 > {

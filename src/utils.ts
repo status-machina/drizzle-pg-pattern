@@ -12,11 +12,11 @@ type RequiredFields<T> = {
 };
 
 type KeysWithNumericValues<T> = {
-  [key in keyof RequiredFields<T>]: RequiredFields<T>[key] extends number ? key : never;
+  [key in keyof T]: T[key] extends number ? key : never;
 }[keyof T];
 
 type KeysWithStringValues<T> = {
-  [key in keyof RequiredFields<T>]: RequiredFields<T>[key] extends string ? key : never;
+  [key in keyof T]: T[key] extends string ? key : never;
 }[keyof T];
 
 type ObjectWithOnlyNumericValues<T> = {
@@ -42,5 +42,5 @@ export type ObjectWithOnlyStringOrNumberArrayValues<T> =
   ObjectWithOnlyNumericArrayValues<T> & ObjectWithOnlyStringArrayValues<T>;
 
 export type ObjectWithOnlyStringOrNumberValuesOrArrayValues<T> =
-  ObjectWithOnlyStringOrNumberValues<T> |
-    ObjectWithOnlyStringOrNumberArrayValues<T>;
+  ObjectWithOnlyStringOrNumberValues<RequiredFields<T>> |
+    ObjectWithOnlyStringOrNumberArrayValues<RequiredFields<T>>;
