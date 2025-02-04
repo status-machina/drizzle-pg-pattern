@@ -27,8 +27,6 @@ import {
 } from "./utils";
 import { PgInsertValue, PgUpdateSetSource, PgDialect } from "drizzle-orm/pg-core";
 import { monotonicFactory } from "ulidx";
-import { ProjectionBase } from "./projection";
-import { MultiStreamProjectionBase } from "./multiStreamProjection";
 
 
 export type EventClient<

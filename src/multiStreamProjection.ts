@@ -1,10 +1,20 @@
 import { EventClient } from "./eventDbHelpers";
 import { GenericEventBase, GenericEventInput } from "./schemaHelpers";
 import {
-  ObjectWithOnlyStringOrNumberValues,
   ObjectWithOnlyStringOrNumberValuesOrArrayValues,
   EventFromType,
 } from "./utils";
+
+type EventStreamQueryOptions<
+  T extends string,
+  E extends GenericEventBase<T>,
+> = {
+  eventTypes: T[];
+  /** The data to filter the events by. If an array is provided, the events will be filtered as if
+   * any one of the values in the array matches. Only string and number values are supported.
+   */
+  options: { data?: Partial<ObjectWithOnlyStringOrNumberValuesOrArrayValues<E["data"]>>; after?: string };
+};
 
 const isUnsavedEvent = <E extends GenericEventBase<any>>(
   event: E | GenericEventInput<E>
@@ -127,7 +137,7 @@ export class MultiStreamProjectionBase<
       throw new Error("id must be implemented");
   }
 
-  protected getStreamOptions(): Promise<{ eventTypes: ET[], options?: { data?: P, after?: string } }[]> | { eventTypes: ET[], options?: { data?: P, after?: string } }[] {
+  protected getStreamOptions(): Promise<EventStreamQueryOptions<ET, E>[]> | EventStreamQueryOptions<ET, E>[] {
       throw new Error("getStreamOptions must be implemented");
   }
 
