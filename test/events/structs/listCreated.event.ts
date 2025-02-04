@@ -5,5 +5,6 @@ export interface ListCreatedEvent extends ExampleAppEventBase {
   data: {
     listId: string;
     listName: string;
+    exampleOptionalField?: string;
   };
 } 

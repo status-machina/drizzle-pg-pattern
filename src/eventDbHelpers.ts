@@ -47,13 +47,13 @@ export type EventClient<
   readonly getLatestEvent: (eventType: EventType, options?: EventQueryOptions<EventType, Events>) => Promise<Events & {
     type: EventType;
   }>;
-  readonly getEventStream: <T extends EventType>(eventTypes: T[], options?: EventQueryOptions<EventType, Events & {
+  readonly getEventStream: <T extends EventType>(eventTypes: T[], options?: EventQueryOptions<T, Events & {
     type: T;
   }>) => Promise<(Events & {
-    type: EventType;
+    type: T;
   })[]>;
-  readonly getEventStreams: <T extends EventType>(streams: { eventTypes: T[], options?: EventQueryOptions<EventType, Events & { type: T }> }[]) => Promise<(Events & {
-    type: EventType;
+  readonly getEventStreams: <T extends EventType>(streams: { eventTypes: T[], options?: EventQueryOptions<T, Events & { type: T }> }[]) => Promise<(Events & {
+    type: T;
   })[]>;
   readonly saveProjection: (params: {
     type: string;
@@ -198,8 +198,8 @@ export function createEventClient<
 
     async getEventStream<T extends EventType>(
       eventTypes: T[],
-      options?: EventQueryOptions<EventType, Events & { type: T }>
-    ): Promise<(Events & { type: EventType })[]> {
+      options?: EventQueryOptions<T, Events & { type: T }>
+    ): Promise<(Events & { type: T })[]> {
       const dbOrTx = options?.tx ?? db;
       const conditions = [inArray(events.type, eventTypes)];
 
@@ -239,13 +239,13 @@ export function createEventClient<
         .select()
         .from(events)
         .where(and(...conditions))
-        .orderBy(asc(events.id))) as (Events & { type: EventType })[];
+        .orderBy(asc(events.id))) as (Events & { type: T })[];
       return result;
     },
 
     async getEventStreams<T extends EventType>(
-      streams: { eventTypes: T[], options?: EventQueryOptions<EventType, Events & { type: T }> }[]
-    ): Promise<(Events & { type: EventType })[]> {
+      streams: { eventTypes: T[], options?: EventQueryOptions<T, Events & { type: T }> }[]
+    ): Promise<(Events & { type: T })[]> {
       const dbOrTx = streams[0]?.options?.tx ?? db;
 
       const results = await Promise.all(

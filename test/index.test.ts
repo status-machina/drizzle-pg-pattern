@@ -283,6 +283,14 @@ describe("Event Sourcing", () => {
       const { events, listId } = getTestEvents();
       const [savedEvent] = await eventClient.saveEvents([events[0]]);
 
+      const _exampleStreamWithOptionalField = await eventClient.getEventStream(
+        [ExampleAppEventTypes.LIST_CREATED],
+        {
+          data: { "exampleOptionalField": "test" },
+        }
+      );
+      
+
       // Try to add item to deleted list
       const archivedEvent = {
         type: ExampleAppEventTypes.LIST_DELETED,
