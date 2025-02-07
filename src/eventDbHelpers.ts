@@ -115,10 +115,9 @@ export function createEventClient<
 >(
   db: DbOrTx<Db>,
   events: GenericEventsTable,
-  projections: GenericProjectionsTable
+  projections: GenericProjectionsTable,
+  ulidGenerator = monotonicFactory()
 ) {
-  const dialect = new PgDialect();
-
   return {
     async saveEvent(
       eventInput: InputOf<Events>,
@@ -136,11 +135,10 @@ export function createEventClient<
       eventInputs: T[],
       tx?: DbOrTx<Db>
     ) {
-      const ulid = monotonicFactory();
       const dbOrTx = tx ?? db;
       const result = (await dbOrTx
         .insert(events)
-        .values(eventInputs.map((event) => ({ ...event, id: ulid() })))
+        .values(eventInputs.map((event) => ({ ...event, id: event.id ?? ulidGenerator() })))
         .returning()) as (Events & { type: EventType })[];
       return result;
     },
@@ -415,9 +413,7 @@ export function createEventClient<
       latestEventId: string,
       streams: StreamDefinition<EventType, Events>[]
     ): Promise<Events & { type: EventType }> {
-
-      const ulid = monotonicFactory();
-      const eventWithId = eventInput.id ? eventInput : { ...eventInput, id: ulid() };
+      const eventWithId = eventInput.id ? eventInput : { ...eventInput, id: ulidGenerator() };
 
       // Build each stream check
       const streamChecks = streams.map((stream, i) => {

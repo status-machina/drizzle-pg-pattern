@@ -9,6 +9,7 @@ import { ExampleAppEventTypes } from "./eventBase";
 import { createEventClient } from "../../dist";
 import { exampleAppEvents, exampleAppProjections } from '../drizzle/schema'
 import { db } from "../drizzle/db";
+import { ulid, monotonicFactory} from "ulidx";
 
 export { ExampleAppEventTypes } from "./eventBase";
 
@@ -26,12 +27,12 @@ export type ExampleAppEventInput =
   InputOf<ExampleAppEvent>;
 
 // Create a function to get the event client with the current db instance
-export const getEventClient = () => {
+export const getEventClient = (ulidGenerator?: ReturnType<typeof monotonicFactory>) => {
   return createEventClient<
     ExampleAppEventTypes,
     ExampleAppEvent,
     Record<string, unknown>,
     any,
     ExampleAppDb
-  >(db, exampleAppEvents, exampleAppProjections);
+  >(db, exampleAppEvents, exampleAppProjections, ulidGenerator);
 };
