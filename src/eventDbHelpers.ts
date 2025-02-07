@@ -245,19 +245,53 @@ export function createEventClient<
       streams: { eventTypes: T[], options?: EventQueryOptions<T, Events & { type: T }> }[]
     ): Promise<(Events & { type: T })[]> {
       const dbOrTx = streams[0]?.options?.tx ?? db;
+      const conditions: SQL<unknown>[] = [];
 
-      const results = await Promise.all(
-        streams.map(({ eventTypes, options }) =>
-          this.getEventStream(eventTypes, { ...options, tx: dbOrTx })
-        )
-      );
+      streams.forEach(({ eventTypes, options }) => {
+        const streamConditions: SQL<unknown>[] = [inArray(events.type, eventTypes)];
 
-      const allEvents = results.flat();
-      const uniqueEvents = Array.from(
-        new Map(allEvents.map(event => [event.id, event])).values()
-      );
+        if (options?.after) {
+          streamConditions.push(gt(events.id, options.after));
+        }
 
-      return uniqueEvents.sort((a, b) => a.id.localeCompare(b.id));
+        if (options?.data) {
+          const dataConditions = Object.entries(options.data)
+            .map(([key, value]): SQL<unknown> | undefined => {
+              if (value === undefined) return undefined;
+              if (Array.isArray(value)) {
+                return value.length > 0
+                  ? or(...value.map((v) => sql`${events.data}->>${key} = ${v.toString()}`))
+                  : undefined;
+              }
+              return isDefined(value)
+                ? sql`${events.data}->>${key} = ${value.toString()}`
+                : undefined;
+            })
+            .filter(isDefined);
+
+          const dataSql = dataConditions.length > 0 ? and(...dataConditions) : undefined;
+          if (dataSql) {
+            streamConditions.push(dataSql);
+          }
+        }
+
+        const streamSql = streamConditions.length > 0 ? and(...streamConditions) : undefined;
+        if (streamSql) {
+          conditions.push(streamSql);
+        }
+      });
+
+      if (conditions.length === 0) {
+        return [];
+      }
+
+      const result = await dbOrTx
+        .select()
+        .from(events)
+        .where(or(...conditions))
+        .orderBy(asc(events.id)) as (Events & { type: T })[];
+
+      return result;
     },
 
     /**
@@ -284,17 +318,24 @@ export function createEventClient<
         .values(params)
         .onConflictDoUpdate({
           target: [projections.type, projections.id],
-          where: sql`${projections.latestEventId} <= ${params.latestEventId}`,
           set: {
-            data: params.data,
-            latestEventId: params.latestEventId,
+            data: sql`CASE 
+              WHEN ${projections.latestEventId} <= ${params.latestEventId} 
+              THEN ${JSON.stringify(params.data)}::jsonb 
+              ELSE ${projections.data} 
+            END`,
+            latestEventId: sql`CASE 
+              WHEN ${projections.latestEventId} <= ${params.latestEventId} 
+              THEN ${params.latestEventId}
+              ELSE ${projections.latestEventId}
+            END`,
           },
         })
         .returning({
           status: sql<"created" | "updated" | "skipped">`
             CASE 
               WHEN xmax::text::int = 0 THEN 'created'
-              WHEN xmax::text::int > 0 AND ${projections.latestEventId} <= ${params.latestEventId} THEN 'updated'
+              WHEN ${projections.latestEventId} <= ${params.latestEventId} THEN 'updated'
               ELSE 'skipped'
             END`,
           type: projections.type,
