@@ -86,7 +86,7 @@ export class MultiStreamProjectionBase<
   }
 
   /** Save the projection to the database */
-  public async saveProjection() {
+  public async saveProjection(overwrite = false) {
     const unsavedEvents = this._stagedEvents.filter(isUnsavedEvent);
     if (unsavedEvents.length > 0) {
       throw new Error("Cannot save projection with unpersisted events");
@@ -106,6 +106,7 @@ export class MultiStreamProjectionBase<
       id: this.id,
       data: await this.asJson(),
       latestEventId,
+      forceUpdate: overwrite,
     });
   }
 

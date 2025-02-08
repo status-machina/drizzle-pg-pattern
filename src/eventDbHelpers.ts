@@ -58,7 +58,22 @@ export type EventClient<
     id: string;
     data: Record<string, unknown>;
     latestEventId: string;
+    forceUpdate?: boolean;
   } & PgInsertValue<GenericProjectionsTable> & PgUpdateSetSource<GenericProjectionsTable>) => Promise<{
+    id: string;
+    data: unknown;
+    type: string;
+    latestEventId: string;
+    status: "created" | "updated" | "skipped";
+  }>;
+  readonly forceUpdateProjection: (params: Parameters<EventClient['saveProjection']>[0]) => Promise<{
+    id: string;
+    data: unknown;
+    type: string;
+    latestEventId: string;
+    status: "created" | "updated" | "skipped";
+  }>;
+  readonly conditionalUpdateProjection: (params: Parameters<EventClient['saveProjection']>[0]) => Promise<{
     id: string;
     data: unknown;
     type: string;
@@ -308,9 +323,42 @@ export function createEventClient<
         id: string;
         data: Record<string, unknown>;
         latestEventId: string;
+        forceUpdate?: boolean;
       } & PgInsertValue<GenericProjectionsTable> &
         PgUpdateSetSource<GenericProjectionsTable>
     ) {
+      return params.forceUpdate
+        ? this.forceUpdateProjection(params)
+        : this.conditionalUpdateProjection(params);
+    },
+
+    async forceUpdateProjection(params: Parameters<EventClient['saveProjection']>[0]) {
+      const [result] = await db
+        .insert(projections)
+        .values(params)
+        .onConflictDoUpdate({
+          target: [projections.type, projections.id],
+          set: {
+            data: sql`${JSON.stringify(params.data)}::jsonb`,
+            latestEventId: params.latestEventId,
+          },
+        })
+        .returning({
+          status: sql<"created" | "updated" | "skipped">`
+            CASE 
+              WHEN xmax::text::int = 0 THEN 'created'
+              ELSE 'updated'
+            END`,
+          type: projections.type,
+          id: projections.id,
+          data: projections.data,
+          latestEventId: projections.latestEventId,
+        });
+
+      return result;
+    },
+
+    async conditionalUpdateProjection(params: Parameters<EventClient['saveProjection']>[0]) {
       const [result] = await db
         .insert(projections)
         .values(params)

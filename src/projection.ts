@@ -23,20 +23,22 @@ export class ProjectionBase<
     E["data"]
   > = ObjectWithOnlyStringOrNumberValues<E["data"]>,
   K extends keyof O = keyof O,
-  P extends Partial<Pick<O, K>> = Partial<Pick<O, K>>,
+  P extends Partial<Pick<O, K>> = Partial<Pick<O, K>>
 > {
   /** The types of events required to reconstruct this projection */
   protected get eventTypes(): ET[] {
-      throw new Error("eventTypes must be implemented");
+    throw new Error("eventTypes must be implemented");
   }
   /** The type of this projection, used to look up the projection in the database */
   protected get projectionType(): string {
-      throw new Error("projectionType must be implemented"); 
+    throw new Error("projectionType must be implemented");
   }
 
   protected _events?: Promise<(E | GenericEventInput<E>)[]>;
   protected _stagedEvents: (E | GenericEventInput<E>)[] = [];
-  private _savedProjection?: Promise<{ data: V; latestEventId: string } | undefined>;
+  private _savedProjection?: Promise<
+    { data: V; latestEventId: string } | undefined
+  >;
   private _eventIdentifiers?: Promise<P> | P;
 
   constructor(
@@ -60,7 +62,7 @@ export class ProjectionBase<
   }
 
   private async getEventsAfterIdentifiers() {
-    const data = await this.eventIdentifiers() as unknown as Partial<
+    const data = (await this.eventIdentifiers()) as unknown as Partial<
       ObjectWithOnlyStringOrNumberValues<E["data"]>
     >;
     const projection = await this.savedProjection;
@@ -78,7 +80,7 @@ export class ProjectionBase<
   protected async projectionEvents() {
     return (await this.events)
       .concat(this._stagedEvents)
-      .sort((a, b) => (a.id ?? "") < (b.id ?? "") ? -1 : 1);
+      .sort((a, b) => ((a.id ?? "") < (b.id ?? "") ? -1 : 1));
   }
 
   /** Stage events without saving them to the database */
@@ -95,14 +97,14 @@ export class ProjectionBase<
 
   /** Reduce events with a custom reducer function */
   protected async reduceEvents<T>(
-    reducer: (acc: T, event: E | GenericEventInput<  E>) => T,
+    reducer: (acc: T, event: E | GenericEventInput<E>) => T,
     initialValue: T
   ): Promise<T> {
     return (await this.projectionEvents()).reduce(reducer, initialValue);
   }
 
   /** Save the projection to the database */
-  public async saveProjection() {
+  public async saveProjection(overwrite = false) {
     const unsavedEvents = this._stagedEvents.filter(isUnsavedEvent);
     if (unsavedEvents.length > 0) {
       throw new Error("Cannot save projection with unpersisted events");
@@ -122,11 +124,15 @@ export class ProjectionBase<
       id: this.id,
       data: await this.asJson(),
       latestEventId,
+      forceUpdate: overwrite,
     });
   }
 
   /** Get a value from the saved projection or return the fallback */
-  protected async fromProjectionOrDefault<T>(key: keyof V, fallback: T): Promise<T> {
+  protected async fromProjectionOrDefault<T>(
+    key: keyof V,
+    fallback: T
+  ): Promise<T> {
     const projection = await this.savedProjection;
     if (projection === undefined) return fallback;
 
@@ -134,14 +140,14 @@ export class ProjectionBase<
   }
 
   public get id(): string {
-      throw new Error("id must be implemented");
+    throw new Error("id must be implemented");
   }
 
   protected getEventIdentifiers(): Promise<P> | P {
-      throw new Error("getEventIdentifiers must be implemented");
+    throw new Error("getEventIdentifiers must be implemented");
   }
 
   public async asJson(): Promise<V> {
-      throw new Error("asJson must be implemented");
+    throw new Error("asJson must be implemented");
   }
 }

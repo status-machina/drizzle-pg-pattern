@@ -205,6 +205,62 @@ describe("Event Sourcing", () => {
     expect(view.completedItems).toHaveLength(0);
   });
 
+  it("should respect forceUpdate when saving projections", async () => {
+    const { events, listId } = getTestEvents();
+    const [firstEvent, secondEvent] = await eventClient.saveEvents([events[0], events[1]]);
+
+    // Save initial projection
+    await eventClient.saveProjection({
+      type: "TEST_PROJECTION",
+      id: listId,
+      data: { version: 1 },
+      latestEventId: secondEvent.id,
+    });
+
+    // Try to update with older event ID - should be skipped
+    const skipResult = await eventClient.saveProjection({
+      type: "TEST_PROJECTION",
+      id: listId,
+      data: { version: 1 },
+      latestEventId: firstEvent.id,
+    });
+    expect(skipResult.status).toBe("skipped");
+    expect((skipResult.data as { version: number }).version).toBe(1);
+
+    // Force update with older event ID - should succeed
+    const forceResult = await eventClient.saveProjection({
+      type: "TEST_PROJECTION",
+      id: listId,
+      data: { version: 2 },
+      latestEventId: firstEvent.id,
+      forceUpdate: true,
+    });
+    expect(forceResult.status).toBe("updated");
+    expect((forceResult.data as { version: number }).version).toBe(2);
+  });
+
+  it("should respect forceUpdate through projection classes", async () => {
+    const { events, listId, itemId } = getTestEvents();
+    const [firstEvent, secondEvent] = await eventClient.saveEvents([events[0], events[1]]);
+
+    // Create and save initial projection
+    const projection = new TodoListProjection(listId, eventClient);
+    const initialSave = await projection.saveProjection();
+    expect(initialSave.status).toBe("created");
+
+    // Create new projection with only first event
+    const oldProjection = new TodoListProjection(listId, eventClient);
+    await oldProjection.fromHistory([firstEvent]);
+    
+    // Try to save without force - should be skipped
+    const skipSave = await oldProjection.saveProjection();
+    expect(skipSave.status).toBe("skipped");
+
+    // Try to save with force - should update
+    const forceSave = await oldProjection.saveProjection(true);
+    expect(forceSave.status).toBe("updated");
+  });
+
   it("should combine list and item events in multi-stream projection", async () => {
     const { events, listId, itemId } = getTestEvents();
     await eventClient.saveEvents(events);
