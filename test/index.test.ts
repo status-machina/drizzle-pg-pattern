@@ -66,6 +66,53 @@ describe("Event Sourcing", () => {
     expect(thirdId).toBeDefined();
   });
 
+  describe.only("getLatestEvent", () => {
+    it("should get latest event by type", async () => {
+      const { events, listId } = getTestEvents();
+      const savedEvents = await eventClient.saveEvents(events);
+      const latestEvent = await eventClient.getLatestEvent(ExampleAppEventTypes.ITEM_COMPLETED);
+      expect(latestEvent.type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
+      expect(latestEvent.data.listId).toBe(listId);
+    });
+
+    it("should get latest event after specific event", async () => {
+      const { events, listId } = getTestEvents();
+      const [firstEvent] = await eventClient.saveEvents(events);
+      const latestEvent = await eventClient.getLatestEvent(ExampleAppEventTypes.ITEM_ADDED, {
+        after: firstEvent.id
+      });
+      expect(latestEvent.type).toBe(ExampleAppEventTypes.ITEM_ADDED);
+      expect(latestEvent.data.listId).toBe(listId);
+    });
+
+    it("should get latest event by type and data", async () => {
+      const { events, listId } = getTestEvents();
+      await eventClient.saveEvents(events);
+      const latestEvent = await eventClient.getLatestEvent(ExampleAppEventTypes.ITEM_COMPLETED, {
+        data: { listId }
+      });
+      expect(latestEvent.type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
+      expect(latestEvent.data.listId).toBe(listId);
+    });
+
+    it("should return undefined when no matching events", async () => {
+      const latestEvent = await eventClient.getLatestEvent(ExampleAppEventTypes.ITEM_COMPLETED, {
+        data: { listId: ulid() }
+      });
+      expect(latestEvent).toBeUndefined();
+    });
+
+    it("should get latest event with array data filter", async () => {
+      const { events, listId } = getTestEvents();
+      await eventClient.saveEvents(events);
+      const latestEvent = await eventClient.getLatestEvent(ExampleAppEventTypes.ITEM_COMPLETED, {
+        data: { listId: [listId, ulid()] }
+      });
+      expect(latestEvent.type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
+      expect(latestEvent.data.listId).toBe(listId);
+    });
+  });
+
   it("should retrieve events by type and data", async () => {
     const { events, listId, itemId } = getTestEvents();
     await eventClient.saveEvents(events);

@@ -170,7 +170,7 @@ export function createEventClient<
       }
 
       if (options?.data) {
-        const dataConditions: SQL<unknown>[] = Object.entries(options.data)
+        const dataConditions = Object.entries(options.data)
           .map(([key, value]): SQL<unknown> | undefined => {
             if (value === undefined) {
               return undefined;
@@ -179,13 +179,13 @@ export function createEventClient<
               return value.length > 0
                 ? or(
                     ...value.map(
-                      (v) => sql`${events.data}->>'${key}' = ${v.toString()}`
+                      (v) => sql`${events.data}->>${key} = ${v.toString()}`
                     )
                   )
                 : undefined;
             }
             return isDefined(value)
-              ? sql`${events.data}->>'${key}' = ${value.toString()}`
+              ? sql`${events.data}->>${key} = ${value.toString()}`
               : undefined;
           })
           .filter(isDefined);
@@ -201,7 +201,7 @@ export function createEventClient<
         .select()
         .from(events)
         .where(and(...conditions))
-        .orderBy(asc(events.id))
+        .orderBy(desc(events.id))
         .limit(1);
 
       return event as Events & { type: EventType };
