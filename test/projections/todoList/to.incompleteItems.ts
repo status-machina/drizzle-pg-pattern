@@ -7,6 +7,11 @@ export const toIncompleteItems = (
   event: ExampleAppEvent
 ) => {
   switch (event.type) {
+    case ExampleAppEventTypes.ITEM_ADDED: {
+      const next = new Set(incompleteItems);
+      next.add(event.data.itemId);
+      return Array.from(next);
+    }
     case ExampleAppEventTypes.ITEM_COMPLETED: {
       const next = new Set(incompleteItems);
       next.delete(event.data.itemId);
