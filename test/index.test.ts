@@ -250,13 +250,14 @@ describe("Event Sourcing", () => {
 
     // Create new projection with only first event
     const oldProjection = new TodoListProjection(listId, eventClient);
-    await oldProjection.fromHistory([firstEvent]);
+    oldProjection.fromHistory([firstEvent]);
     
     // Try to save without force - should be skipped
     const skipSave = await oldProjection.saveProjection();
     expect(skipSave.status).toBe("skipped");
 
     // Try to save with force - should update
+    oldProjection.fromHistory([firstEvent]);
     const forceSave = await oldProjection.saveProjection(true);
     expect(forceSave.status).toBe("updated");
   });
@@ -285,6 +286,97 @@ describe("Event Sourcing", () => {
     expect(updatedView.isDeleted).toBe(true);
     expect(updatedView.items).toHaveLength(0);
     expect(updatedView.completedItems).toHaveLength(1);
+  });
+
+  describe("Projection Dirty State", () => {
+    it("should correctly identify dirty state", async () => {
+      const { events, listId } = getTestEvents();
+      await eventClient.saveEvents([events[0], events[1]]);
+
+      // New projection should be dirty
+      const projection = new TodoListProjection(listId, eventClient);
+      expect(await projection.isDirty()).toBe(true);
+
+      // After saving, should not be dirty (events are cleared)
+      await projection.saveProjection();
+      expect(await projection.isDirty()).toBe(false);
+
+      // After refresh, should be dirty again (new events found)
+      await eventClient.saveEvent(events[2]);
+      projection.refresh();
+      expect(await projection.isDirty()).toBe(true);
+
+      // New projection with no events should not be dirty
+      const emptyProjection = new TodoListProjection(ulid(), eventClient);
+      expect(await emptyProjection.isDirty()).toBe(false);
+    });
+
+    it("should refresh projection state", async () => {
+      const { events, listId } = getTestEvents();
+      await eventClient.saveEvent(events[0]);
+
+      // Create and save initial projection
+      const projection = new TodoListProjection(listId, eventClient);
+      const initialView = await projection.asJson();
+      console.log("initialView", initialView);
+      expect(initialView.items).toHaveLength(0);
+      expect(initialView.completedItems).toHaveLength(0);
+
+      // Add new event - projection should not see it yet
+      await eventClient.saveEvent(events[1]);
+      const cachedView = await projection.asJson();
+      expect(cachedView.items).toHaveLength(0);
+      expect(cachedView.completedItems).toHaveLength(0);
+
+      // After refresh, projection should see new event
+      const refreshedView = await projection.refresh().asJson();
+      console.log("refreshedView", refreshedView);
+      expect(refreshedView.items).toHaveLength(1);
+      expect(refreshedView.completedItems).toHaveLength(0);
+
+      // Should work with multi-stream projections too
+      const multiProjection = new TodoListWithMetaProjection(listId, eventClient);
+      await multiProjection.asJson(); // Cache initial state
+      await eventClient.saveEvent(events[2]);
+      
+      const cachedMultiView = await multiProjection.asJson();
+      expect(cachedMultiView.completedItems).toHaveLength(0);
+      
+      const refreshedMultiView = await multiProjection.refresh().asJson();
+      expect(refreshedMultiView.completedItems).toHaveLength(1);
+    });
+
+    it("should save only when dirty", async () => {
+      const { events, listId } = getTestEvents();
+      await eventClient.saveEvents(events);
+
+      // Should save when dirty
+      const projection = new TodoListProjection(listId, eventClient);
+      const wasSaved = await projection.saveIfDirty();
+      expect(wasSaved).toBe(true);
+
+      // Should not save when not dirty
+      const emptyProjection = new TodoListProjection(ulid(), eventClient);
+      const wasEmptySaved = await emptyProjection.saveIfDirty();
+      expect(wasEmptySaved).toBe(false);
+    });
+
+    it("should work with multi-stream projections", async () => {
+      const { events, listId } = getTestEvents();
+      await eventClient.saveEvents([events[0]]);
+
+      // Should be dirty with events
+      const projection = new TodoListWithMetaProjection(listId, eventClient);
+      expect(await projection.isDirty()).toBe(true);
+      const wasSaved = await projection.saveIfDirty();
+      expect(wasSaved).toBe(true);
+
+      // Should not be dirty without events
+      const emptyProjection = new TodoListWithMetaProjection(ulid(), eventClient);
+      expect(await emptyProjection.isDirty()).toBe(false);
+      const wasEmptySaved = await emptyProjection.saveIfDirty();
+      expect(wasEmptySaved).toBe(false);
+    });
   });
 
   describe("Event Stream Validation", () => {

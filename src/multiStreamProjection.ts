@@ -77,12 +77,35 @@ export class MultiStreamProjectionBase<
     return this;
   }
 
+  /** Clear cached events and projection to force fresh data on next access */
+  public refresh(): this {
+    this._events = undefined;
+    this._savedProjection = undefined;
+    this._stagedEvents = [];
+    return this;
+  }
+
   /** Reduce events with a custom reducer function */
   protected async reduceEvents<T>(
     reducer: (acc: T, event: E | GenericEventInput<E>) => T,
     initialValue: T
   ): Promise<T> {
     return (await this.projectionEvents()).reduce(reducer, initialValue);
+  }
+
+  /** Check if there are events to save */
+  public async isDirty(): Promise<boolean> {
+    const events = await this.projectionEvents();
+    return events?.length > 0;
+  }
+
+  /** Save the projection only if it has events to save, returns true if saved */
+  public async saveIfDirty(overwrite = false): Promise<boolean> {
+    if (await this.isDirty()) {
+      await this.saveProjection(overwrite);
+      return true;
+    }
+    return false;
   }
 
   /** Save the projection to the database */
@@ -93,7 +116,7 @@ export class MultiStreamProjectionBase<
     }
 
     const events = await this.projectionEvents();
-    if (!events?.length) {
+    if (!events?.length && !overwrite) {
       throw new Error("No events to save");
     }
 
@@ -101,13 +124,18 @@ export class MultiStreamProjectionBase<
     if (latestEventId === undefined) {
       throw new Error("Latest event ID is undefined");
     }
-    return await this.eventsClient.saveProjection({
+    const result = await this.eventsClient.saveProjection({
       type: this.projectionType,
       id: this.id,
       data: await this.asJson(),
       latestEventId,
       forceUpdate: overwrite,
     });
+
+    // After successful save, clear events since they're now part of the saved projection
+    this._events = Promise.resolve([]);
+    this._stagedEvents = [];
+    return result;
   }
 
   /** Get a value from the saved projection or return the fallback */
