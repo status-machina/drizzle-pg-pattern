@@ -66,7 +66,7 @@ describe("Event Sourcing", () => {
     expect(thirdId).toBeDefined();
   });
 
-  describe.only("getLatestEvent", () => {
+  describe("getLatestEvent", () => {
     it("should get latest event by type", async () => {
       const { events, listId } = getTestEvents();
       const savedEvents = await eventClient.saveEvents(events);
