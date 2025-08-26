@@ -3,3 +3,6 @@ dist
 drizzle/meta
 drizzle/*.sql
 .npmrc
+
+# file system
+.DS_Store
