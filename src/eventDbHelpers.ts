@@ -29,6 +29,137 @@ import { PgInsertValue, PgUpdateSetSource, PgDialect } from "drizzle-orm/pg-core
 import { monotonicFactory } from "ulidx";
 
 
+export type QueryOperators<T> = {
+  eq?: T;
+  neq?: T;
+  in?: T[];
+  nin?: T[];
+  gt?: T;
+  gte?: T;
+  lt?: T;
+  lte?: T;
+};
+
+export type DataFilter<ED extends Record<string, unknown> = Record<string, unknown>> = {
+  [K in keyof ED]?: QueryOperators<string | number | boolean>;
+};
+
+function buildOperatorConditions(
+  table: GenericEventsTable,
+  filter?: DataFilter
+): SQL<unknown>[] {
+  if (!filter) return [];
+
+  const conditions: SQL<unknown>[] = [];
+
+  for (const [field, operators] of Object.entries(filter)) {
+    if (!operators) continue;
+
+    const fieldConditions: SQL<unknown>[] = [];
+
+    for (const [op, rawValue] of Object.entries(operators)) {
+      if (rawValue === undefined) continue;
+
+      // Array operators: in, nin
+      if (Array.isArray(rawValue)) {
+        const values = rawValue as (string | number | boolean)[];
+        if (values.length === 0) continue;
+        if (op === "in") {
+          const inSql = or(
+            ...values.map((v) => sql`${table.data}->>${field} = ${v.toString()}`)
+          );
+          if (inSql) fieldConditions.push(inSql);
+          continue;
+        }
+        if (op === "nin") {
+          const notInSql = and(
+            ...values.map((v) => sql`${table.data}->>${field} != ${v.toString()}`)
+          );
+          if (notInSql) fieldConditions.push(notInSql);
+          continue;
+        }
+      }
+
+      // Scalar operators
+      const value = rawValue as string | number | boolean;
+      const isNumber = typeof value === "number";
+      const isBoolean = typeof value === "boolean";
+
+      const columnText = sql`${table.data}->>${field}`;
+
+      switch (op) {
+        case "eq":
+          fieldConditions.push(
+            isBoolean
+              ? sql`CAST(${columnText} AS boolean) = ${value}`
+              : isNumber
+              ? sql`CAST(${columnText} AS numeric) = ${value}`
+              : sql`${columnText} = ${value.toString()}`
+          );
+          break;
+        case "neq":
+          fieldConditions.push(
+            isBoolean
+              ? sql`CAST(${columnText} AS boolean) != ${value}`
+              : isNumber
+              ? sql`CAST(${columnText} AS numeric) != ${value}`
+              : sql`${columnText} != ${value.toString()}`
+          );
+          break;
+        case "gt":
+          fieldConditions.push(
+            isBoolean
+              ? sql`CAST(${columnText} AS boolean) > ${value}`
+              : isNumber
+              ? sql`CAST(${columnText} AS numeric) > ${value}`
+              : sql`${columnText} > ${value.toString()}`
+          );
+          break;
+        case "gte":
+          fieldConditions.push(
+            isBoolean
+              ? sql`CAST(${columnText} AS boolean) >= ${value}`
+              : isNumber
+              ? sql`CAST(${columnText} AS numeric) >= ${value}`
+              : sql`${columnText} >= ${value.toString()}`
+          );
+          break;
+        case "lt":
+          fieldConditions.push(
+            isBoolean
+              ? sql`CAST(${columnText} AS boolean) < ${value}`
+              : isNumber
+              ? sql`CAST(${columnText} AS numeric) < ${value}`
+              : sql`${columnText} < ${value.toString()}`
+          );
+          break;
+        case "lte":
+          fieldConditions.push(
+            isBoolean
+              ? sql`CAST(${columnText} AS boolean) <= ${value}`
+              : isNumber
+              ? sql`CAST(${columnText} AS numeric) <= ${value}`
+              : sql`${columnText} <= ${value.toString()}`
+          );
+          break;
+        default:
+          // Unknown operator: ignore
+          break;
+      }
+    }
+
+    if (fieldConditions.length > 0) {
+      const combined = and(...fieldConditions);
+      if (combined) {
+        conditions.push(combined);
+      }
+    }
+  }
+
+  return conditions;
+}
+
+
 export type EventClient<
   EventType extends string = any,
   Events extends GenericEventBase<EventType> = any,
@@ -110,7 +241,7 @@ type EventQueryOptions<
   /** The data to filter the events by. If an array is provided, the events will be filtered as if
    * any one of the values in the array matches. Only string and number values are supported.
    */
-  data?: Partial<ObjectWithOnlyStringOrNumberValuesOrArrayValues<E["data"]>>;
+  data?: Partial<ObjectWithOnlyStringOrNumberValuesOrArrayValues<E["data"]>> | DataFilter;
   tx?: D;
 };
 
@@ -170,18 +301,30 @@ export function createEventClient<
       }
 
       if (options?.data) {
-        const dataConditions = Object.entries(options.data)
+        const entries = Object.entries(options.data);
+        const simplePairs: [string, string | number][] = [];
+        const operatorFilters: DataFilter = {};
+
+        entries.forEach(([key, value]) => {
+          if (value === undefined) return;
+          if (Array.isArray(value)) {
+            if (value.length > 0) simplePairs.push([key, value as unknown as string | number]);
+            return;
+          }
+          if (typeof value === 'object') {
+            (operatorFilters as Record<string, unknown>)[key] = value as unknown;
+            return;
+          }
+          simplePairs.push([key, value as string | number]);
+        });
+
+        // simple equality / array-any semantics (existing behavior)
+        const dataConditions = entries
           .map(([key, value]): SQL<unknown> | undefined => {
-            if (value === undefined) {
-              return undefined;
-            }
+            if (value === undefined) return undefined;
             if (Array.isArray(value)) {
               return value.length > 0
-                ? or(
-                    ...value.map(
-                      (v) => sql`${events.data}->>${key} = ${v.toString()}`
-                    )
-                  )
+                ? or(...value.map((v) => sql`${events.data}->>${key} = ${v.toString()}`))
                 : undefined;
             }
             return isDefined(value)
@@ -190,10 +333,16 @@ export function createEventClient<
           })
           .filter(isDefined);
 
-        const dataSql =
-          dataConditions.length > 0 ? and(...dataConditions) : undefined;
-        if (dataSql) {
-          conditions.push(dataSql);
+        const dataSql = dataConditions.length > 0 ? and(...dataConditions) : undefined;
+        if (dataSql) conditions.push(dataSql);
+
+        // operator-based semantics when any object values present
+        if (Object.keys(operatorFilters).length > 0) {
+          const filterConditions = buildOperatorConditions(events, operatorFilters);
+          if (filterConditions.length > 0) {
+            const filtersSql = and(...filterConditions);
+            if (filtersSql) conditions.push(filtersSql);
+          }
         }
       }
 
@@ -219,30 +368,34 @@ export function createEventClient<
       }
 
       if (options?.data) {
-        const dataConditions = Object.entries(options.data)
+        const entries = Object.entries(options.data);
+        const operatorFilters: DataFilter = {};
+
+        const dataConditions = entries
           .map(([key, value]): SQL<unknown> | undefined => {
-            if (value === undefined) {
-              return undefined;
-            }
+            if (value === undefined) return undefined;
             if (Array.isArray(value)) {
               return value.length > 0
-                ? or(
-                    ...value.map(
-                      (v) => sql`${events.data}->>${key} = ${v.toString()}`
-                    )
-                  )
+                ? or(...value.map((v) => sql`${events.data}->>${key} = ${v.toString()}`))
                 : undefined;
             }
-            return isDefined(value)
-              ? sql`${events.data}->>${key} = ${value.toString()}`
-              : undefined;
+            if (typeof value === 'object') {
+              (operatorFilters as Record<string, unknown>)[key] = value as unknown;
+              return undefined; // skip simple equality for operator-based
+            }
+            return sql`${events.data}->>${key} = ${value.toString()}`;
           })
           .filter(isDefined);
 
-        const dataSql =
-          dataConditions.length > 0 ? and(...dataConditions) : undefined;
-        if (dataSql) {
-          conditions.push(dataSql);
+        const dataSql = dataConditions.length > 0 ? and(...dataConditions) : undefined;
+        if (dataSql) conditions.push(dataSql);
+
+        if (Object.keys(operatorFilters).length > 0) {
+          const filterConditions = buildOperatorConditions(events, operatorFilters);
+          if (filterConditions.length > 0) {
+            const filtersSql = and(...filterConditions);
+            if (filtersSql) conditions.push(filtersSql);
+          }
         }
       }
 
@@ -268,7 +421,10 @@ export function createEventClient<
         }
 
         if (options?.data) {
-          const dataConditions = Object.entries(options.data)
+          const entries = Object.entries(options.data);
+          const operatorFilters: DataFilter = {};
+
+          const dataConditions = entries
             .map(([key, value]): SQL<unknown> | undefined => {
               if (value === undefined) return undefined;
               if (Array.isArray(value)) {
@@ -276,15 +432,25 @@ export function createEventClient<
                   ? or(...value.map((v) => sql`${events.data}->>${key} = ${v.toString()}`))
                   : undefined;
               }
-              return isDefined(value)
-                ? sql`${events.data}->>${key} = ${value.toString()}`
-                : undefined;
+              if (typeof value === 'object') {
+                (operatorFilters as Record<string, unknown>)[key] = value as unknown;
+                return undefined;
+              }
+              return sql`${events.data}->>${key} = ${value.toString()}`;
             })
             .filter(isDefined);
 
           const dataSql = dataConditions.length > 0 ? and(...dataConditions) : undefined;
           if (dataSql) {
             streamConditions.push(dataSql);
+          }
+
+          if (Object.keys(operatorFilters).length > 0) {
+            const filterConditions = buildOperatorConditions(events, operatorFilters);
+            if (filterConditions.length > 0) {
+              const filtersSql = and(...filterConditions);
+              if (filtersSql) streamConditions.push(filtersSql);
+            }
           }
         }
 
@@ -306,6 +472,7 @@ export function createEventClient<
 
       return result;
     },
+
 
     /**
      * Save a projection to the database. If the projection already exists,

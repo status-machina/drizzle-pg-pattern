@@ -21,6 +21,8 @@ export {
   createEventClient,
 } from "./eventDbHelpers";
 
+export { type DataFilter, type QueryOperators } from "./eventDbHelpers";
+
 export {
   type ObjectWithOnlyStringOrNumberValues,
   type ObjectWithOnlyStringOrNumberValuesOrArrayValues,

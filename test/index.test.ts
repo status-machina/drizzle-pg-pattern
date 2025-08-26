@@ -159,6 +159,156 @@ describe("Event Sourcing", () => {
     expect(mergedEvents[2].type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
   });
 
+  describe("getEventStream (operator filters via data)", () => {
+    it("should filter by eq across a field", async () => {
+      const { events, listId } = getTestEvents();
+      await eventClient.saveEvents(events);
+
+      const result = await eventClient.getEventStream(
+        [ExampleAppEventTypes.LIST_CREATED],
+        { data: { listId: { eq: listId } } as any }
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe(ExampleAppEventTypes.LIST_CREATED);
+      expect(result[0].data.listId).toBe(listId);
+    });
+
+    it("should support IN across values", async () => {
+      const { events, listId, itemId } = getTestEvents();
+      await eventClient.saveEvents(events);
+
+      const result = await eventClient.getEventStream(
+        [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
+        { data: { itemId: { in: [itemId, "non-existent"] } } as any }
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0].type).toBe(ExampleAppEventTypes.ITEM_ADDED);
+      expect(result[1].type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
+    });
+
+    it("should support NOT IN to exclude matches", async () => {
+      const { events, listId, itemId } = getTestEvents();
+      await eventClient.saveEvents(events);
+
+      const result = await eventClient.getEventStream(
+        [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
+        { data: { listId: { eq: listId }, itemId: { nin: [itemId] } } as any }
+      );
+
+      expect(result).toHaveLength(0);
+    });
+
+    it("should combine multiple field filters (AND)", async () => {
+      const { events, listId, itemId } = getTestEvents();
+      await eventClient.saveEvents(events);
+
+      const result = await eventClient.getEventStream(
+        [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
+        { data: { listId: { eq: listId }, itemId: { eq: itemId } } as any }
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0].data.listId).toBe(listId);
+      expect(result[1].data.listId).toBe(listId);
+    });
+
+    it("should respect the after cursor", async () => {
+      const { events, listId, itemId } = getTestEvents();
+      const saved = await eventClient.saveEvents(events);
+      const afterId = saved[0].id; // after LIST_CREATED
+
+      const result = await eventClient.getEventStream(
+        [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
+        { after: afterId, data: { listId: { eq: listId } } as any }
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0].type).toBe(ExampleAppEventTypes.ITEM_ADDED);
+      expect(result[1].type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
+    });
+
+    it("should support comparison operators on string fields", async () => {
+      const { events } = getTestEvents();
+      await eventClient.saveEvents(events);
+
+      const result = await eventClient.getEventStream(
+        [ExampleAppEventTypes.ITEM_ADDED],
+        { data: { itemName: { gte: "A" } } as any }
+      );
+
+      expect(result.length).toBeGreaterThanOrEqual(1);
+      expect(result[0].type).toBe(ExampleAppEventTypes.ITEM_ADDED);
+    });
+
+    it("should ignore empty operator objects (no-op)", async () => {
+      const { events, listId } = getTestEvents();
+      await eventClient.saveEvents(events);
+
+      const result = await eventClient.getEventStream(
+        [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
+        { data: { listId: { eq: listId }, itemId: {} } as any }
+      );
+
+      expect(result).toHaveLength(2);
+    });
+
+    it("should apply contradictory in and nin as empty set", async () => {
+      const { events, listId, itemId } = getTestEvents();
+      await eventClient.saveEvents(events);
+
+      const result = await eventClient.getEventStream(
+        [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
+        { data: { listId: { eq: listId }, itemId: { in: [itemId], nin: [itemId] } } as any }
+      );
+
+      expect(result).toHaveLength(0);
+    });
+
+    it("should support string range with gte and lt", async () => {
+      const { events, listId } = getTestEvents();
+      await eventClient.saveEvents(events);
+      await eventClient.saveEvent({
+        type: ExampleAppEventTypes.ITEM_ADDED,
+        data: { listId, itemId: ulid(), itemName: "Apple" },
+      });
+
+      const result = await eventClient.getEventStream(
+        [ExampleAppEventTypes.ITEM_ADDED],
+        { data: { listId: { eq: listId }, itemName: { gte: "S", lt: "Z" } } as any }
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].data.itemName >= "S").toBe(true);
+      expect(result[0].data.itemName < "Z").toBe(true);
+    });
+
+    it("should ignore unknown operator keys", async () => {
+      const { events, listId, itemId } = getTestEvents();
+      await eventClient.saveEvents(events);
+
+      const result = await eventClient.getEventStream(
+        [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
+        { data: { listId: { eq: listId }, itemId: { eq: itemId, foo: "bar" } } as any }
+      );
+
+      expect(result).toHaveLength(2);
+    });
+
+    it("should treat empty in/nin arrays as no-ops", async () => {
+      const { events, listId } = getTestEvents();
+      await eventClient.saveEvents(events);
+
+      const result = await eventClient.getEventStream(
+        [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
+        { data: { listId: { eq: listId }, itemId: { in: [], nin: [] } } as any }
+      );
+
+      expect(result).toHaveLength(2);
+    });
+  });
+
   it("should build projection from events", async () => {
     const { events, listId, itemId } = getTestEvents();
     await eventClient.saveEvents(events);
