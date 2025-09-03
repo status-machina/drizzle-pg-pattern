@@ -214,6 +214,65 @@ await client.saveEventWithStreamValidation(
 
 This approach prevents race conditions where the cart might have been checked out or modified between when you checked the state and when you tried to add the item.
 
+### Querying Events
+
+You can query events using simple equality/array-any filters or more advanced operator-based filters.
+
+```typescript
+// Equality and "any-of" semantics for arrays
+await client.getEventStream(
+  [AppEventTypes.ITEM_ADDED_TO_CART],
+  { data: { cartId: "cart_123", productId: ["prod_1", "prod_2"] } }
+);
+
+// Operator-based filters (numbers, strings, booleans)
+await client.getEventStream(
+  [AppEventTypes.ITEM_ADDED_TO_CART],
+  {
+    data: {
+      quantity: { gte: 2 },
+      priceAtTime: { lt: 5000 },
+      userId: { in: ["user_123", "user_456"] },
+      productId: { nin: ["prod_999"] }
+    }
+  }
+);
+
+// Boolean operator filters
+await client.getEventStream(
+  [AppEventTypes.CART_CHECKED_OUT],
+  { data: { isCheckedOut: { eq: true } } }
+);
+
+// Get the latest matching event with an "after" cursor
+const latest = await client.getLatestEvent(AppEventTypes.ITEM_ADDED_TO_CART, {
+  after: "01J123...ULID",
+  data: { cartId: { eq: "cart_123" } }
+});
+
+// Multiple streams with independent filters
+const events = await client.getEventStreams([
+  {
+    eventTypes: [
+      AppEventTypes.CART_CREATED,
+      AppEventTypes.CART_CHECKED_OUT
+    ],
+    options: { data: { cartId: { eq: "cart_123" } } }
+  },
+  {
+    eventTypes: [
+      AppEventTypes.ITEM_ADDED_TO_CART,
+      AppEventTypes.ITEM_REMOVED_FROM_CART
+    ],
+    options: { data: { cartId: { eq: "cart_123" }, quantity: { gt: 0 } } }
+  }
+]);
+
+// Available operators: eq, neq, in, nin, gt, gte, lt, lte
+```
+
+Operator objects are supported for string, number, and boolean fields in `data`. These operators apply to event queries (`getLatestEvent`, `getEventStream`, `getEventStreams`). Projection queries remain equality/array-any.
+
 ### Querying Projections
 
 You can query projections by their type and data:

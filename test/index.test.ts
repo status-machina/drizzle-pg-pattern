@@ -70,7 +70,9 @@ describe("Event Sourcing", () => {
     it("should get latest event by type", async () => {
       const { events, listId } = getTestEvents();
       const savedEvents = await eventClient.saveEvents(events);
-      const latestEvent = await eventClient.getLatestEvent(ExampleAppEventTypes.ITEM_COMPLETED);
+      const latestEvent = await eventClient.getLatestEvent(
+        ExampleAppEventTypes.ITEM_COMPLETED
+      );
       expect(latestEvent.type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
       expect(latestEvent.data.listId).toBe(listId);
     });
@@ -78,9 +80,12 @@ describe("Event Sourcing", () => {
     it("should get latest event after specific event", async () => {
       const { events, listId } = getTestEvents();
       const [firstEvent] = await eventClient.saveEvents(events);
-      const latestEvent = await eventClient.getLatestEvent(ExampleAppEventTypes.ITEM_ADDED, {
-        after: firstEvent.id
-      });
+      const latestEvent = await eventClient.getLatestEvent(
+        ExampleAppEventTypes.ITEM_ADDED,
+        {
+          after: firstEvent.id,
+        }
+      );
       expect(latestEvent.type).toBe(ExampleAppEventTypes.ITEM_ADDED);
       expect(latestEvent.data.listId).toBe(listId);
     });
@@ -88,26 +93,35 @@ describe("Event Sourcing", () => {
     it("should get latest event by type and data", async () => {
       const { events, listId } = getTestEvents();
       await eventClient.saveEvents(events);
-      const latestEvent = await eventClient.getLatestEvent(ExampleAppEventTypes.ITEM_COMPLETED, {
-        data: { listId }
-      });
+      const latestEvent = await eventClient.getLatestEvent(
+        ExampleAppEventTypes.ITEM_COMPLETED,
+        {
+          data: { listId },
+        }
+      );
       expect(latestEvent.type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
       expect(latestEvent.data.listId).toBe(listId);
     });
 
     it("should return undefined when no matching events", async () => {
-      const latestEvent = await eventClient.getLatestEvent(ExampleAppEventTypes.ITEM_COMPLETED, {
-        data: { listId: ulid() }
-      });
+      const latestEvent = await eventClient.getLatestEvent(
+        ExampleAppEventTypes.ITEM_COMPLETED,
+        {
+          data: { listId: ulid() },
+        }
+      );
       expect(latestEvent).toBeUndefined();
     });
 
     it("should get latest event with array data filter", async () => {
       const { events, listId } = getTestEvents();
       await eventClient.saveEvents(events);
-      const latestEvent = await eventClient.getLatestEvent(ExampleAppEventTypes.ITEM_COMPLETED, {
-        data: { listId: [listId, ulid()] }
-      });
+      const latestEvent = await eventClient.getLatestEvent(
+        ExampleAppEventTypes.ITEM_COMPLETED,
+        {
+          data: { listId: [listId, ulid()] },
+        }
+      );
       expect(latestEvent.type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
       expect(latestEvent.data.listId).toBe(listId);
     });
@@ -143,12 +157,15 @@ describe("Event Sourcing", () => {
     const streams = [
       {
         eventTypes: [ExampleAppEventTypes.LIST_CREATED],
-        options: { data: { listId } }
+        options: { data: { listId } },
       },
       {
-        eventTypes: [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
-        options: { data: { itemId } }
-      }
+        eventTypes: [
+          ExampleAppEventTypes.ITEM_ADDED,
+          ExampleAppEventTypes.ITEM_COMPLETED,
+        ],
+        options: { data: { itemId } },
+      },
     ];
 
     const mergedEvents = await eventClient.getEventStreams(streams);
@@ -166,7 +183,7 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.LIST_CREATED],
-        { data: { listId: { eq: listId } } as any }
+        { data: { listId: { eq: listId } } }
       );
 
       expect(result).toHaveLength(1);
@@ -180,7 +197,7 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
-        { data: { itemId: { in: [itemId, "non-existent"] } } as any }
+        { data: { itemId: { in: [itemId, "non-existent"] } } }
       );
 
       expect(result).toHaveLength(2);
@@ -194,7 +211,7 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
-        { data: { listId: { eq: listId }, itemId: { nin: [itemId] } } as any }
+        { data: { listId: { eq: listId }, itemId: { nin: [itemId] } } }
       );
 
       expect(result).toHaveLength(0);
@@ -206,7 +223,7 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
-        { data: { listId: { eq: listId }, itemId: { eq: itemId } } as any }
+        { data: { listId: { eq: listId }, itemId: { eq: itemId } } }
       );
 
       expect(result).toHaveLength(2);
@@ -221,7 +238,7 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
-        { after: afterId, data: { listId: { eq: listId } } as any }
+        { after: afterId, data: { listId: { eq: listId } } }
       );
 
       expect(result).toHaveLength(2);
@@ -235,7 +252,7 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.ITEM_ADDED],
-        { data: { itemName: { gte: "A" } } as any }
+        { data: { itemName: { gte: "A" } } }
       );
 
       expect(result.length).toBeGreaterThanOrEqual(1);
@@ -248,7 +265,7 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
-        { data: { listId: { eq: listId }, itemId: {} } as any }
+        { data: { listId: { eq: listId }, itemId: {} } }
       );
 
       expect(result).toHaveLength(2);
@@ -260,7 +277,12 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
-        { data: { listId: { eq: listId }, itemId: { in: [itemId], nin: [itemId] } } as any }
+        {
+          data: {
+            listId: { eq: listId },
+            itemId: { in: [itemId], nin: [itemId] },
+          },
+        }
       );
 
       expect(result).toHaveLength(0);
@@ -276,7 +298,7 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.ITEM_ADDED],
-        { data: { listId: { eq: listId }, itemName: { gte: "S", lt: "Z" } } as any }
+        { data: { listId: { eq: listId }, itemName: { gte: "S", lt: "Z" } } }
       );
 
       expect(result).toHaveLength(1);
@@ -290,7 +312,7 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
-        { data: { listId: { eq: listId }, itemId: { eq: itemId, foo: "bar" } } as any }
+        { data: { listId: { eq: listId }, itemId: { eq: itemId, foo: "bar" } } }
       );
 
       expect(result).toHaveLength(2);
@@ -302,7 +324,7 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
-        { data: { listId: { eq: listId }, itemId: { in: [], nin: [] } } as any }
+        { data: { listId: { eq: listId }, itemId: { in: [], nin: [] } } }
       );
 
       expect(result).toHaveLength(2);
@@ -348,34 +370,36 @@ describe("Event Sourcing", () => {
 
     // Query by type only
     const allTodoLists = await eventClient.queryProjections({
-      type: "TODO_LIST"
+      type: "TODO_LIST",
     });
     expect(allTodoLists.length).toBeGreaterThanOrEqual(2);
-    expect(allTodoLists.map(l => l.data.listId)).toContain(listId1);
-    expect(allTodoLists.map(l => l.data.listId)).toContain(listId2);
+    expect(allTodoLists.map((l) => l.data.listId)).toContain(listId1);
+    expect(allTodoLists.map((l) => l.data.listId)).toContain(listId2);
 
     // Query by type and data
-    const specificList = await eventClient.queryProjections<TodoListProjection>({
-      type: "TODO_LIST",
-      data: { listId: listId1 }
-    });
+    const specificList = await eventClient.queryProjections<TodoListProjection>(
+      {
+        type: "TODO_LIST",
+        data: { listId: listId1 },
+      }
+    );
     expect(specificList).toHaveLength(1);
     expect(specificList[0].data.items).toHaveLength(0);
 
     // Query that should return no results
     const emptyResult = await eventClient.queryProjections({
       type: "TODO_LIST",
-      data: { listId: "non-existent-id" }
+      data: { listId: "non-existent-id" },
     });
     expect(emptyResult).toHaveLength(0);
 
     const twoLists = await eventClient.queryProjections({
       type: "TODO_LIST",
-      data: { listId: [listId1, listId2] }
+      data: { listId: [listId1, listId2] },
     });
     expect(twoLists).toHaveLength(2);
-    expect(twoLists.map(l => l.data.listId)).toContain(listId1);
-    expect(twoLists.map(l => l.data.listId)).toContain(listId2);
+    expect(twoLists.map((l) => l.data.listId)).toContain(listId1);
+    expect(twoLists.map((l) => l.data.listId)).toContain(listId2);
   });
 
   it("should update projection with new events", async () => {
@@ -404,7 +428,10 @@ describe("Event Sourcing", () => {
 
   it("should respect forceUpdate when saving projections", async () => {
     const { events, listId } = getTestEvents();
-    const [firstEvent, secondEvent] = await eventClient.saveEvents([events[0], events[1]]);
+    const [firstEvent, secondEvent] = await eventClient.saveEvents([
+      events[0],
+      events[1],
+    ]);
 
     // Save initial projection
     await eventClient.saveProjection({
@@ -438,7 +465,10 @@ describe("Event Sourcing", () => {
 
   it("should respect forceUpdate through projection classes", async () => {
     const { events, listId, itemId } = getTestEvents();
-    const [firstEvent, secondEvent] = await eventClient.saveEvents([events[0], events[1]]);
+    const [firstEvent, secondEvent] = await eventClient.saveEvents([
+      events[0],
+      events[1],
+    ]);
 
     // Create and save initial projection
     const projection = new TodoListProjection(listId, eventClient);
@@ -448,7 +478,7 @@ describe("Event Sourcing", () => {
     // Create new projection with only first event
     const oldProjection = new TodoListProjection(listId, eventClient);
     oldProjection.fromHistory([firstEvent]);
-    
+
     // Try to save without force - should be skipped
     const skipSave = await oldProjection.saveProjection();
     expect(skipSave.status).toBe("skipped");
@@ -475,10 +505,13 @@ describe("Event Sourcing", () => {
     // Delete the list
     await eventClient.saveEvent({
       type: ExampleAppEventTypes.LIST_DELETED,
-      data: { listId }
+      data: { listId },
     });
 
-    const updatedProjection = new TodoListWithMetaProjection(listId, eventClient);
+    const updatedProjection = new TodoListWithMetaProjection(
+      listId,
+      eventClient
+    );
     const updatedView = await updatedProjection.asJson();
     expect(updatedView.isDeleted).toBe(true);
     expect(updatedView.items).toHaveLength(0);
@@ -532,13 +565,16 @@ describe("Event Sourcing", () => {
       expect(refreshedView.completedItems).toHaveLength(0);
 
       // Should work with multi-stream projections too
-      const multiProjection = new TodoListWithMetaProjection(listId, eventClient);
+      const multiProjection = new TodoListWithMetaProjection(
+        listId,
+        eventClient
+      );
       await multiProjection.asJson(); // Cache initial state
       await eventClient.saveEvent(events[2]);
-      
+
       const cachedMultiView = await multiProjection.asJson();
       expect(cachedMultiView.completedItems).toHaveLength(0);
-      
+
       const refreshedMultiView = await multiProjection.refresh().asJson();
       expect(refreshedMultiView.completedItems).toHaveLength(1);
     });
@@ -569,7 +605,10 @@ describe("Event Sourcing", () => {
       expect(wasSaved).toBe(true);
 
       // Should not be dirty without events
-      const emptyProjection = new TodoListWithMetaProjection(ulid(), eventClient);
+      const emptyProjection = new TodoListWithMetaProjection(
+        ulid(),
+        eventClient
+      );
       expect(await emptyProjection.isDirty()).toBe(false);
       const wasEmptySaved = await emptyProjection.saveIfDirty();
       expect(wasEmptySaved).toBe(false);
@@ -597,7 +636,7 @@ describe("Event Sourcing", () => {
 
       expect(result).toBeDefined();
       expect(result.type).toBe(ExampleAppEventTypes.ITEM_ADDED);
-      expect((result.data as ItemAddedEvent['data']).itemId).toBe(itemId);
+      expect((result.data as ItemAddedEvent["data"]).itemId).toBe(itemId);
     });
 
     it("should reject event when newer events exist", async () => {
@@ -608,19 +647,15 @@ describe("Event Sourcing", () => {
       ]);
 
       await expect(
-        eventClient.saveEventWithStreamValidation(
-          events[2],
-          firstEvent.id,
-          [
-            {
-              types: [
-                ExampleAppEventTypes.ITEM_ADDED,
-                ExampleAppEventTypes.ITEM_COMPLETED,
-              ],
-              identifier: { listId },
-            },
-          ]
-        )
+        eventClient.saveEventWithStreamValidation(events[2], firstEvent.id, [
+          {
+            types: [
+              ExampleAppEventTypes.ITEM_ADDED,
+              ExampleAppEventTypes.ITEM_COMPLETED,
+            ],
+            identifier: { listId },
+          },
+        ])
       ).rejects.toThrow("Concurrent modification detected");
     });
 
@@ -631,10 +666,9 @@ describe("Event Sourcing", () => {
       const _exampleStreamWithOptionalField = await eventClient.getEventStream(
         [ExampleAppEventTypes.LIST_CREATED],
         {
-          data: { "exampleOptionalField": "test" },
+          data: { exampleOptionalField: "test" },
         }
       );
-      
 
       // Try to add item to deleted list
       const archivedEvent = {
@@ -643,28 +677,24 @@ describe("Event Sourcing", () => {
       } as const;
 
       await expect(
-        eventClient.saveEventWithStreamValidation(
-          events[1],
-          savedEvent.id,
-          [
-            {
-              // Check list events
-              types: [
-                ExampleAppEventTypes.LIST_CREATED,
-                ExampleAppEventTypes.LIST_DELETED,
-              ],
-              identifier: { listId },
-            },
-            {
-              // Check item events
-              types: [
-                ExampleAppEventTypes.ITEM_ADDED,
-                ExampleAppEventTypes.ITEM_COMPLETED,
-              ],
-              identifier: { listId },
-            },
-          ]
-        )
+        eventClient.saveEventWithStreamValidation(events[1], savedEvent.id, [
+          {
+            // Check list events
+            types: [
+              ExampleAppEventTypes.LIST_CREATED,
+              ExampleAppEventTypes.LIST_DELETED,
+            ],
+            identifier: { listId },
+          },
+          {
+            // Check item events
+            types: [
+              ExampleAppEventTypes.ITEM_ADDED,
+              ExampleAppEventTypes.ITEM_COMPLETED,
+            ],
+            identifier: { listId },
+          },
+        ])
       ).resolves.toBeDefined();
 
       // Archive the list

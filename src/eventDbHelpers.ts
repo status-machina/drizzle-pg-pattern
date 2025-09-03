@@ -30,13 +30,21 @@ import { monotonicFactory } from "ulidx";
 
 
 export type QueryOperators<T> = {
+  /** Equality */
   eq?: T;
+  /** Not equal */
   neq?: T;
+  /** In */
   in?: T[];
+  /** Not in */
   nin?: T[];
+  /** Greater than */
   gt?: T;
+  /** Greater than or equal to */
   gte?: T;
+  /** Less than */
   lt?: T;
+  /** Less than or equal to */
   lte?: T;
 };
 
