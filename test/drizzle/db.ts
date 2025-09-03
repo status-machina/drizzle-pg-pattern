@@ -14,7 +14,7 @@ export let db: ReturnType<typeof drizzle>;
 
 export async function setupTestDatabase() {
   console.log("Setting up test database...");
-  container = await new PostgreSqlContainer()
+  container = await new PostgreSqlContainer('postgres:16-alpine')
     .withDatabase(process.env.POSTGRES_DB!)
     .withUsername(process.env.POSTGRES_USER!)
     .withPassword(process.env.POSTGRES_PASSWORD!)
