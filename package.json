@@ -1,6 +1,6 @@
 {
   "name": "@status-machina/drizzle-pg-pattern",
-  "version": "0.0.19-alpha.0",
+  "version": "0.0.19-alpha.1",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
