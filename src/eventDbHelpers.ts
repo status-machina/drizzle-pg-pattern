@@ -280,7 +280,7 @@ export function createEventClient<
       const dbOrTx = tx ?? db;
       const [savedEvent] = await dbOrTx
         .insert(events)
-        .values(eventInput)
+        .values({...eventInput, id: eventInput.id ?? ulidGenerator()})
         .returning();
       return savedEvent as Events & { type: EventType };
     },
