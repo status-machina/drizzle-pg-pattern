@@ -5,6 +5,7 @@ export enum ExampleAppEventTypes {
     ITEM_REMOVED = "ITEM_REMOVED",
     ITEM_COMPLETED = "ITEM_COMPLETED",
     ITEM_UNCOMPLETED = "ITEM_UNCOMPLETED",
+    ITEM_RANKED = "ITEM_RANKED",
 }
 
 export type ExampleAppEventBase = {

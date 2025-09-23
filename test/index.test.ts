@@ -301,6 +301,15 @@ describe("Event Sourcing", () => {
         { data: { listId: { eq: listId }, itemName: { gte: "S", lt: "Z" } } }
       );
 
+      eventClient.getEventStream([
+        ExampleAppEventTypes.ITEM_RANKED,
+      ], {
+        data: {
+          itemName: { gte: "S", lt: "Z" },
+          itemRank: [10],
+        }
+      })
+
       expect(result).toHaveLength(1);
       expect(result[0].data.itemName >= "S").toBe(true);
       expect(result[0].data.itemName < "Z").toBe(true);
@@ -312,7 +321,7 @@ describe("Event Sourcing", () => {
 
       const result = await eventClient.getEventStream(
         [ExampleAppEventTypes.ITEM_ADDED, ExampleAppEventTypes.ITEM_COMPLETED],
-        { data: { listId: { eq: listId }, itemId: { eq: itemId, foo: "bar" } } }
+        { data: { listId: { eq: listId }, itemId: { eq: itemId, foo: "bar" } as unknown as {eq: string} } }
       );
 
       expect(result).toHaveLength(2);
