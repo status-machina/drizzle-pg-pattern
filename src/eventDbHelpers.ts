@@ -707,9 +707,9 @@ export function createEventClient<
     ): Promise<Events & { type: EventType }> {
       const eventWithId = eventInput.id ? eventInput : { ...eventInput, id: ulidGenerator() };
 
-      // Build each stream check
-      const streamChecks = streams.map((stream, i) => {
-        const check = sql`NOT EXISTS (
+      // Build each stream check (NOT EXISTS newer conflicting events for each stream)
+      const streamChecks = streams.map((stream) => {
+        return sql`NOT EXISTS (
           SELECT 1 FROM ${events}
           WHERE ${inArray(events.type, stream.types)}
           AND ${events.id}::text > ${latestEventId}::text
@@ -720,21 +720,34 @@ export function createEventClient<
             sql` AND `
           )}
         )`;
-
-        return check;
       });
 
-      const query = sql`
-        WITH new_event AS (
-          INSERT INTO ${events} (id, type, data, created_at, updated_at)
-          VALUES (${eventWithId.id}, ${eventWithId.type}, ${JSON.stringify(eventWithId.data)}::jsonb, DEFAULT, DEFAULT)
-          RETURNING *
-        )
-        SELECT * FROM new_event
-        WHERE ${sql.join(streamChecks, sql` AND `)}
-      `;
+      let savedEvent: Events | undefined;
 
-      const [savedEvent] = await db.execute<Events>(query);
+      if (streamChecks.length === 0) {
+        // No validation streams provided; perform a straightforward insert
+        const inserted = await db
+          .insert(events)
+          .values({ ...eventWithId })
+          .returning();
+        savedEvent = inserted[0] as Events;
+      } else {
+        // Conditional insert that only occurs if all stream checks pass
+        const query = sql`
+          INSERT INTO ${events} (id, type, data)
+          SELECT v.id, v.type, v.data
+          FROM (VALUES (
+            ${eventWithId.id},
+            ${eventWithId.type},
+            ${JSON.stringify(eventWithId.data)}::jsonb
+          )) AS v(id, type, data)
+          WHERE ${sql.join(streamChecks, sql` AND `)}
+          RETURNING *
+        `;
+
+        const [result] = await db.execute<Events>(query);
+        savedEvent = result as Events | undefined;
+      }
 
       if (!savedEvent) {
         throw new Error(

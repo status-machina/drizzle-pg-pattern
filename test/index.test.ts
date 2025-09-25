@@ -701,6 +701,16 @@ describe("Event Sourcing", () => {
         events[1],
       ]);
 
+      const beforeCount = (
+        await eventClient.getEventStream(
+          [
+            ExampleAppEventTypes.ITEM_ADDED,
+            ExampleAppEventTypes.ITEM_COMPLETED,
+          ],
+          { data: { listId } }
+        )
+      ).length;
+
       await expect(
         eventClient.saveEventWithStreamValidation(events[2], firstEvent.id, [
           {
@@ -712,6 +722,18 @@ describe("Event Sourcing", () => {
           },
         ])
       ).rejects.toThrow("Concurrent modification detected");
+
+      const afterCount = (
+        await eventClient.getEventStream(
+          [
+            ExampleAppEventTypes.ITEM_ADDED,
+            ExampleAppEventTypes.ITEM_COMPLETED,
+          ],
+          { data: { listId } }
+        )
+      ).length;
+
+      expect(afterCount).toBe(beforeCount);
     });
 
     it("should validate multiple streams", async () => {
@@ -756,6 +778,16 @@ describe("Event Sourcing", () => {
       await eventClient.saveEvent(archivedEvent);
 
       // Try to add another item after archival
+      const beforeCount = (
+        await eventClient.getEventStream(
+          [
+            ExampleAppEventTypes.ITEM_ADDED,
+            ExampleAppEventTypes.ITEM_COMPLETED,
+          ],
+          { data: { listId } }
+        )
+      ).length;
+
       await expect(
         eventClient.saveEventWithStreamValidation(
           {
@@ -781,6 +813,18 @@ describe("Event Sourcing", () => {
           ]
         )
       ).rejects.toThrow("Concurrent modification detected");
+
+      const afterCount = (
+        await eventClient.getEventStream(
+          [
+            ExampleAppEventTypes.ITEM_ADDED,
+            ExampleAppEventTypes.ITEM_COMPLETED,
+          ],
+          { data: { listId } }
+        )
+      ).length;
+
+      expect(afterCount).toBe(beforeCount);
     });
   });
 });
