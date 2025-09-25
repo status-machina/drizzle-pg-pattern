@@ -24,6 +24,8 @@ import {
 import {
   isDefined,
   ObjectWithOnlyStringOrNumberValuesOrArrayValues,
+  DataForEventTypes,
+  StreamOptionsForEvents,
 } from "./utils";
 import { PgInsertValue, PgUpdateSetSource, PgDialect } from "drizzle-orm/pg-core";
 import { monotonicFactory } from "ulidx";
@@ -50,6 +52,11 @@ export type QueryOperators<T> = {
 
 export type DataFilter<ED extends Record<string, unknown> = Record<string, unknown>> = {
   [K in keyof ED]?: QueryOperators<string | number | boolean>;
+};
+
+type PrimitiveValue = string | number | boolean;
+type FlexibleDataFilter<ED extends Record<string, unknown>> = {
+  [K in keyof ED]?: PrimitiveValue | PrimitiveValue[] | QueryOperators<PrimitiveValue>;
 };
 
 function buildOperatorConditions(
@@ -189,9 +196,8 @@ export type EventClient<
   }>) => Promise<(Events & {
     type: T;
   })[]>;
-  readonly getEventStreams: <T extends EventType>(streams: { eventTypes: T[], options?: EventQueryOptions<T, Events & { type: T }> }[]) => Promise<(Events & {
-    type: T;
-  })[]>;
+  readonly getEventStreams: <T extends EventType>(streams: { eventTypes: T[], options?: EventQueryOptions<T, Events & { type: T }> }[]) => Promise<(Events & { type: T })[]>;
+  readonly getLatestEventFromStreams: <T extends EventType>(streams: { eventTypes: T[], options?: EventQueryOptions<T, Events & { type: T }> }[]) => Promise<(Events & { type: T }) | undefined>;
   readonly saveProjection: (params: {
     type: string;
     id: string;
@@ -249,7 +255,7 @@ type EventQueryOptions<
   /** The data to filter the events by. If an array is provided, the events will be filtered as if
    * any one of the values in the array matches. Only string and number values are supported.
    */
-  data?: Partial<ObjectWithOnlyStringOrNumberValuesOrArrayValues<E["data"]>> | DataFilter;
+  data?: Partial<FlexibleDataFilter<DataForEventTypes<E, T> & Record<string, unknown>>>;
   tx?: D;
 };
 
@@ -415,10 +421,10 @@ export function createEventClient<
       return result;
     },
 
-    async getEventStreams<T extends EventType>(
-      streams: { eventTypes: T[], options?: EventQueryOptions<T, Events & { type: T }> }[]
-    ): Promise<(Events & { type: T })[]> {
-      const dbOrTx = streams[0]?.options?.tx ?? db;
+    async getEventStreams<S extends StreamOptionsForEvents<Events, any>[]>(
+      streams: S
+    ): Promise<(Events & { type: S[number]['eventTypes'][number] })[]> {
+      const dbOrTx = (streams[0]?.options as { tx?: DbOrTx<Db> } | undefined)?.tx ?? db;
       const conditions: SQL<unknown>[] = [];
 
       streams.forEach(({ eventTypes, options }) => {
@@ -476,9 +482,72 @@ export function createEventClient<
         .select()
         .from(events)
         .where(or(...conditions))
-        .orderBy(asc(events.id)) as (Events & { type: T })[];
+        .orderBy(asc(events.id)) as (Events & { type: S[number]['eventTypes'][number] })[];
 
       return result;
+    },
+
+    async getLatestEventFromStreams<S extends StreamOptionsForEvents<Events, any>[]>(
+      streams: S
+    ): Promise<(Events & { type: S[number]['eventTypes'][number] }) | undefined> {
+      const dbOrTx = (streams[0]?.options as { tx?: DbOrTx<Db> } | undefined)?.tx ?? db;
+      const conditions: SQL<unknown>[] = [];
+
+      streams.forEach(({ eventTypes, options }) => {
+        const streamConditions: SQL<unknown>[] = [inArray(events.type, eventTypes)];
+
+        if (options?.after) {
+          streamConditions.push(gt(events.id, options.after));
+        }
+
+        if (options?.data) {
+          const entries = Object.entries(options.data);
+          const operatorFilters: DataFilter = {};
+
+          const dataConditions = entries
+            .map(([key, value]): SQL<unknown> | undefined => {
+              if (value === undefined) return undefined;
+              if (Array.isArray(value)) {
+                return value.length > 0
+                  ? or(...value.map((v) => sql`${events.data}->>${key} = ${v.toString()}`))
+                  : undefined;
+              }
+              if (typeof value === 'object') {
+                (operatorFilters as Record<string, unknown>)[key] = value as unknown;
+                return undefined;
+              }
+              return sql`${events.data}->>${key} = ${value.toString()}`;
+            })
+            .filter(isDefined);
+
+          const dataSql = dataConditions.length > 0 ? and(...dataConditions) : undefined;
+          if (dataSql) streamConditions.push(dataSql);
+
+          if (Object.keys(operatorFilters).length > 0) {
+            const filterConditions = buildOperatorConditions(events, operatorFilters);
+            if (filterConditions.length > 0) {
+              const filtersSql = and(...filterConditions);
+              if (filtersSql) streamConditions.push(filtersSql);
+            }
+          }
+        }
+
+        const streamSql = streamConditions.length > 0 ? and(...streamConditions) : undefined;
+        if (streamSql) conditions.push(streamSql);
+      });
+
+      if (conditions.length === 0) {
+        return undefined;
+      }
+
+      const [event] = await dbOrTx
+        .select()
+        .from(events)
+        .where(or(...conditions))
+        .orderBy(desc(events.id))
+        .limit(1);
+
+      return event as (Events & { type: S[number]['eventTypes'][number] }) | undefined;
     },
 
 

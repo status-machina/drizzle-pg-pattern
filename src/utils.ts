@@ -32,9 +32,25 @@ export type StreamOptionsForEvents<
 > = {
   eventTypes: Type[];
   options?: {
-    data?: Partial<ObjectWithOnlyStringOrNumberValuesOrArrayValues<IntersectEventData<Events, Type>>>;
+    data?: Partial<FlexibleStreamData<IntersectEventData<Events, Type>>>;
     after?: string;
   };
+};
+
+type PrimitiveValue = string | number | boolean;
+type QueryOperators<T> = {
+  eq?: T;
+  neq?: T;
+  in?: T[];
+  nin?: T[];
+  gt?: T;
+  gte?: T;
+  lt?: T;
+  lte?: T;
+};
+
+type FlexibleStreamData<T> = {
+  [K in keyof T]?: PrimitiveValue | PrimitiveValue[] | QueryOperators<PrimitiveValue>;
 };
 
 type KeysWithNumericValues<T> = {

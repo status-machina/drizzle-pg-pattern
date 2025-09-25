@@ -6,6 +6,7 @@ import { ulid } from "ulidx";
 import { setupTestDatabase, teardownTestDatabase } from "./drizzle/db";
 import { ItemAddedEvent } from "./events/structs/itemAdded.event";
 import { TodoListWithMetaProjection } from "./projections/todoList/todoListWithMeta.projection";
+import { ItemCompletedEvent } from "./events/structs/itemCompleted.event";
 
 describe("Event Sourcing", () => {
   let eventClient: ReturnType<typeof getEventClient>;
@@ -124,6 +125,51 @@ describe("Event Sourcing", () => {
       );
       expect(latestEvent.type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
       expect(latestEvent.data.listId).toBe(listId);
+    });
+  });
+
+  describe("getLatestEventFromStreams", () => {
+    it("should get latest event across streams", async () => {
+      const { events, listId, itemId } = getTestEvents();
+      await eventClient.saveEvents(events);
+
+      const latest = await eventClient.getLatestEventFromStreams([
+        { eventTypes: [ExampleAppEventTypes.LIST_CREATED], options: { data: { listId } } },
+        { eventTypes: [
+            ExampleAppEventTypes.ITEM_ADDED,
+            ExampleAppEventTypes.ITEM_COMPLETED,
+          ], options: { data: { itemId: { in: [itemId]} } } },
+      ]) as ItemAddedEvent;
+
+      expect(latest.type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
+      expect(latest.data.listId).toBe(listId);
+      expect(latest.data.itemId).toBe(itemId);
+    });
+
+    it("should respect the after cursor across streams", async () => {
+      const { events, listId, itemId } = getTestEvents();
+      const saved = await eventClient.saveEvents(events);
+      const after = saved[0].id; // after LIST_CREATED
+
+      const latest = await eventClient.getLatestEventFromStreams([
+        { eventTypes: [ExampleAppEventTypes.LIST_CREATED], options: { data: { listId }, after } },
+        { eventTypes: [
+            ExampleAppEventTypes.ITEM_ADDED,
+            ExampleAppEventTypes.ITEM_COMPLETED,
+          ], options: { data: { itemId }, after } },
+      ]) as ItemCompletedEvent;
+
+      expect(latest.type).toBe(ExampleAppEventTypes.ITEM_COMPLETED);
+      expect(latest.data.listId).toBe(listId);
+      expect(latest.data.itemId).toBe(itemId);
+    });
+
+    it("should return undefined when no matching events", async () => {
+      const latest = await eventClient.getLatestEventFromStreams([
+        { eventTypes: [ExampleAppEventTypes.ITEM_ADDED], options: { data: { listId: ulid() } } },
+      ]);
+
+      expect(latest).toBeUndefined();
     });
   });
 
