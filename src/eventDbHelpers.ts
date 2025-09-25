@@ -722,39 +722,55 @@ export function createEventClient<
         )`;
       });
 
-      let savedEvent: Events | undefined;
+      const maxRetries = 3;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const result = await (db as PostgresJsDatabase<any>).transaction(async (tx) => {
+            // Ensure SERIALIZABLE isolation for write-skew prevention
+            await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL SERIALIZABLE`);
 
-      if (streamChecks.length === 0) {
-        // No validation streams provided; perform a straightforward insert
-        const inserted = await db
-          .insert(events)
-          .values({ ...eventWithId })
-          .returning();
-        savedEvent = inserted[0] as Events;
-      } else {
-        // Conditional insert that only occurs if all stream checks pass
-        const query = sql`
-          INSERT INTO ${events} (id, type, data)
-          SELECT v.id, v.type, v.data
-          FROM (VALUES (
-            ${eventWithId.id},
-            ${eventWithId.type},
-            ${JSON.stringify(eventWithId.data)}::jsonb
-          )) AS v(id, type, data)
-          WHERE ${sql.join(streamChecks, sql` AND `)}
-          RETURNING *
-        `;
+            if (streamChecks.length === 0) {
+              const inserted = await tx
+                .insert(events)
+                .values({ ...eventWithId })
+                .returning();
+              return inserted[0] as Events;
+            }
 
-        const [result] = await db.execute<Events>(query);
-        savedEvent = result as Events | undefined;
+            const query = sql`
+              INSERT INTO ${events} (id, type, data)
+              SELECT v.id, v.type, v.data
+              FROM (VALUES (
+                ${eventWithId.id},
+                ${eventWithId.type},
+                ${JSON.stringify(eventWithId.data)}::jsonb
+              )) AS v(id, type, data)
+              WHERE ${sql.join(streamChecks, sql` AND `)}
+              RETURNING *
+            `;
+
+            const [row] = await tx.execute<Events>(query);
+            if (!row) {
+              throw new Error(
+                "Concurrent modification detected - newer events exist in one or more streams"
+              );
+            }
+            return row as Events;
+          });
+
+          return result as Events & { type: EventType };
+        } catch (error) {
+          const err = error as { code?: string; message?: string };
+          const isSerializationFailure = err?.code === "40001" || /could not serialize access/i.test(err?.message ?? "");
+          if (isSerializationFailure && attempt < maxRetries - 1) {
+            continue; // retry
+          }
+          throw error;
+        }
       }
 
-      if (!savedEvent) {
-        throw new Error(
-          "Concurrent modification detected - newer events exist in one or more streams"
-        );
-      }
-      return savedEvent as Events & { type: EventType };
+      // Unreachable due to return/throw above; TypeScript requires a return
+      throw new Error("Unexpected error during serializable transaction");
     },
   } as const;
 }

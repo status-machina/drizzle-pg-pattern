@@ -826,5 +826,62 @@ describe("Event Sourcing", () => {
 
       expect(afterCount).toBe(beforeCount);
     });
+
+    it("should allow only one concurrent writer for same stream", async () => {
+      const { events, listId } = getTestEvents();
+      const [savedEvent] = await eventClient.saveEvents([events[0]]); // LIST_CREATED
+
+      const beforeCount = (
+        await eventClient.getEventStream(
+          [
+            ExampleAppEventTypes.ITEM_ADDED,
+            ExampleAppEventTypes.ITEM_COMPLETED,
+          ],
+          { data: { listId } }
+        )
+      ).length;
+
+      const e1 = {
+        type: ExampleAppEventTypes.ITEM_ADDED,
+        data: { listId, itemId: ulid(), itemName: "Concurrent A" },
+      } as const;
+      const e2 = {
+        type: ExampleAppEventTypes.ITEM_ADDED,
+        data: { listId, itemId: ulid(), itemName: "Concurrent B" },
+      } as const;
+
+      const streams = [
+        {
+          types: [
+            ExampleAppEventTypes.ITEM_ADDED,
+            ExampleAppEventTypes.ITEM_COMPLETED,
+          ],
+          identifier: { listId },
+        },
+      ] as const;
+
+      const [r1, r2] = await Promise.allSettled([
+        eventClient.saveEventWithStreamValidation(e1, savedEvent.id, streams as any),
+        eventClient.saveEventWithStreamValidation(e2, savedEvent.id, streams as any),
+      ]);
+
+      const successes = [r1, r2].filter((r) => r.status === "fulfilled");
+      const failures = [r1, r2].filter((r) => r.status === "rejected");
+
+      expect(successes.length).toBe(1);
+      expect(failures.length).toBe(1);
+
+      const afterCount = (
+        await eventClient.getEventStream(
+          [
+            ExampleAppEventTypes.ITEM_ADDED,
+            ExampleAppEventTypes.ITEM_COMPLETED,
+          ],
+          { data: { listId } }
+        )
+      ).length;
+
+      expect(afterCount).toBe(beforeCount + 1);
+    });
   });
 });
