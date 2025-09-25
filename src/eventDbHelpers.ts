@@ -421,9 +421,9 @@ export function createEventClient<
       return result;
     },
 
-    async getEventStreams<S extends StreamOptionsForEvents<Events, any>[]>(
-      streams: S
-    ): Promise<(Events & { type: S[number]['eventTypes'][number] })[]> {
+    async getEventStreams<U extends EventType>(
+      streams: StreamOptionsForEvents<Events & { type: U }, U>[]
+    ): Promise<(Events & { type: U })[]> {
       const dbOrTx = (streams[0]?.options as { tx?: DbOrTx<Db> } | undefined)?.tx ?? db;
       const conditions: SQL<unknown>[] = [];
 
@@ -482,14 +482,14 @@ export function createEventClient<
         .select()
         .from(events)
         .where(or(...conditions))
-        .orderBy(asc(events.id)) as (Events & { type: S[number]['eventTypes'][number] })[];
+        .orderBy(asc(events.id)) as (Events & { type: U })[];
 
       return result;
     },
 
-    async getLatestEventFromStreams<S extends StreamOptionsForEvents<Events, any>[]>(
-      streams: S
-    ): Promise<(Events & { type: S[number]['eventTypes'][number] }) | undefined> {
+    async getLatestEventFromStreams<U extends EventType>(
+      streams: StreamOptionsForEvents<Events & { type: U }, U>[]
+    ): Promise<(Events & { type: U }) | undefined> {
       const dbOrTx = (streams[0]?.options as { tx?: DbOrTx<Db> } | undefined)?.tx ?? db;
       const conditions: SQL<unknown>[] = [];
 
@@ -547,7 +547,7 @@ export function createEventClient<
         .orderBy(desc(events.id))
         .limit(1);
 
-      return event as (Events & { type: S[number]['eventTypes'][number] }) | undefined;
+      return event as (Events & { type: U }) | undefined;
     },
 
 
